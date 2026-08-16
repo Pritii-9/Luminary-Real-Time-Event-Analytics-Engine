@@ -39,7 +39,11 @@ _db_dir = os.path.dirname(settings.sqlite_path)
 if _db_dir:
     os.makedirs(_db_dir, exist_ok=True)
 
-engine = create_engine(f"sqlite:///{settings.sqlite_path}", echo=False)
+if settings.database_url:
+    # SQLModel works out of the box with PostgreSQL
+    engine = create_engine(settings.database_url, echo=False)
+else:
+    engine = create_engine(f"sqlite:///{settings.sqlite_path}", echo=False)
 
 
 def create_tables():

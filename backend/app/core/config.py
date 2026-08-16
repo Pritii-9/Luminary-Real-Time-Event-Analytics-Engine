@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440  # 24 hours
 
-    # SQLite metadata DB
     sqlite_path: str = str(BASE_DIR / "data" / "luminary.db")
+    database_url: str = ""
 
     # GeoIP (optional MaxMind GeoLite2-City.mmdb path)
     geoip_db_path: str = ""

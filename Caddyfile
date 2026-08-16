@@ -1,0 +1,33 @@
+# Luminary Caddy Gateway Configuration
+
+{
+    email admin@luminary.dev
+}
+
+# Frontend Dashboard
+app.luminary.dev, localhost:3000 {
+    reverse_proxy luminary-frontend:3000
+    
+    # Enable compression
+    encode gzip zstd
+}
+
+# API Backend & Ingestion Server
+api.luminary.dev, localhost:8000 {
+    # Reverse proxy backend API
+    reverse_proxy luminary-backend:8000
+    
+    # Increase buffer limit for high concurrency analytics ingestion
+    request_body_limit 2mb
+    
+    # Add gzip compression for API requests
+    encode gzip zstd
+    
+    # Set headers
+    header {
+        # Secure headers
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}

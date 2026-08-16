@@ -1,0 +1,140 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: luminary-db
+    restart: always
+    environment:
+      POSTGRES_USER: luminary
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-luminary_secure_pass_123}
+      POSTGRES_DB: luminary_meta
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luminary -d luminary_meta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: luminary-redis
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest-alpine
+    container_name: luminary-clickhouse
+    restart: always
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_DB=analytics
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-clickhouse_secure_pass_456}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: luminary-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://luminary:${DB_PASSWORD:-luminary_secure_pass_123}@db:5432/luminary_meta
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_STREAM_KEY=events:raw
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-clickhouse_secure_pass_456}
+      - JWT_SECRET=${JWT_SECRET:-super_secure_jwt_secret_generate_random}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://luminary.dev,https://app.luminary.dev}
+      - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
+    volumes:
+      - geoip-data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: luminary-worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://luminary:${DB_PASSWORD:-luminary_secure_pass_123}@db:5432/luminary_meta
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_STREAM_KEY=events:raw
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-clickhouse_secure_pass_456}
+    depends_on:
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: python -m app.workers.stream_worker
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: luminary-frontend
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.luminary.dev
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: luminary-gateway
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres-data:
+  redis-data:
+  clickhouse-data:
+  clickhouse-logs:
+  geoip-data:
+  caddy-data:
+  caddy-config:
