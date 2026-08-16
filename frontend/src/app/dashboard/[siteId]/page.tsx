@@ -1,0 +1,296 @@
+"use client";
+
+import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
+import {
+  fetchSummary,
+  fetchTimeseries,
+  fetchPages,
+  fetchReferrers,
+  fetchDevices,
+  fetchActiveUsers,
+  getSite,
+  getToken,
+  SiteData,
+} from "@/lib/api";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from "recharts";
+import {
+  Eye, Users, Activity, Globe, FileText, ArrowLeft, Zap,
+} from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+
+const CHIC_COLORS = ["#10b981", "#059669", "#047857", "#065f46", "#64748b", "#475569", "#334155"];
+
+export default function DashboardPage({ params }: { params: Promise<{ siteId: string }> }) {
+  const { siteId } = use(params);
+  const router = useRouter();
+  const [site, setSite] = useState<SiteData | null>(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [timeseries, setTimeseries] = useState<any[]>([]);
+  const [pages, setPages] = useState<any[]>([]);
+  const [referrers, setReferrers] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [activeVisitors, setActiveVisitors] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(7);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.push("/login");
+      return;
+    }
+    loadData();
+  }, [siteId, days]);
+
+  // Real-time polling every 5 seconds
+  useEffect(() => {
+    if (!siteId) return;
+    const interval = setInterval(async () => {
+      try {
+        const data = await fetchActiveUsers(siteId);
+        setActiveVisitors(data.active_visitors);
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [siteId]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [siteData, sumData, tsData, pgData, refData, devData, activeData] =
+        await Promise.all([
+          getSite(siteId),
+          fetchSummary(siteId, days),
+          fetchTimeseries(siteId, days),
+          fetchPages(siteId, days),
+          fetchReferrers(siteId, days),
+          fetchDevices(siteId, days),
+          fetchActiveUsers(siteId),
+        ]);
+
+      setSite(siteData);
+      if (sumData) setSummary(sumData);
+      if (tsData) setTimeseries(tsData);
+      if (pgData) setPages(pgData);
+      if (refData) setReferrers(refData);
+      if (devData) setDevices(devData);
+      setActiveVisitors(activeData?.active_visitors || 0);
+    } catch (err) {
+      console.error("Dashboard load error", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-muted">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <span className="text-xs">Loading analytics...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-4 md:p-6 lg:p-8 bg-background text-foreground transition-colors duration-200">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/sites")}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-card-border bg-card/60 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-muted hover:text-foreground transition-all duration-200 cursor-pointer"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{site?.name || siteId}</h1>
+              <p className="text-sm text-muted">{site?.domain} · Last {days} days</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Days filter */}
+            <div className="flex rounded-xl border border-card-border bg-card/50 overflow-hidden p-0.5">
+              {[7, 14, 30].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+                    days === d
+                      ? "bg-accent text-background shadow-sm"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+
+            {/* Real-time badge */}
+            <div className="flex items-center gap-2 rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+              </span>
+              <span className="text-xs font-bold text-accent">{activeVisitors} live</span>
+            </div>
+
+            <ThemeToggle />
+          </div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in" style={{ animationDelay: "100ms" }}>
+          <KpiCard title="Pageviews" value={summary?.pageviews || 0} icon={<Eye className="h-4.5 w-4.5" />} />
+          <KpiCard title="Unique Visitors" value={summary?.visitors || 0} icon={<Users className="h-4.5 w-4.5" />} />
+          <KpiCard title="Sessions" value={summary?.sessions || 0} icon={<Activity className="h-4.5 w-4.5" />} />
+          <KpiCard title="Active Now" value={activeVisitors} icon={<Zap className="h-4.5 w-4.5" />} live />
+        </div>
+
+        {/* Charts */}
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Traffic Over Time */}
+          <div className="animate-fade-in rounded-2xl border border-card-border bg-card p-6 shadow-md" style={{ animationDelay: "200ms" }}>
+            <h2 className="mb-4 text-xs font-bold text-muted uppercase tracking-wider">Traffic Over Time</h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timeseries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                  <XAxis dataKey="event_date" stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
+                  <YAxis stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--card)",
+                      border: "1px solid var(--card-border)",
+                      color: "var(--foreground)",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Line type="monotone" dataKey="pageviews" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--accent)" }} />
+                  <Line type="monotone" dataKey="visitors" stroke="var(--muted)" strokeWidth={2} dot={{ r: 3, fill: "var(--muted)" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Device Breakdown */}
+          <div className="animate-fade-in rounded-2xl border border-card-border bg-card p-6 shadow-md" style={{ animationDelay: "250ms" }}>
+            <h2 className="mb-4 text-xs font-bold text-muted uppercase tracking-wider">Devices</h2>
+            <div className="h-64 flex items-center justify-center">
+              {devices.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={devices} dataKey="views" nameKey="device_type" cx="50%" cy="50%" outerRadius={90} innerRadius={55} paddingAngle={4}>
+                      {devices.map((_, i) => (
+                        <Cell key={i} fill={CHIC_COLORS[i % CHIC_COLORS.length]} stroke="var(--card)" strokeWidth={2} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "var(--card)",
+                        border: "1px solid var(--card-border)",
+                        color: "var(--foreground)",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-muted text-sm font-semibold">No device data yet</p>
+              )}
+            </div>
+            {devices.length > 0 && (
+              <div className="mt-2 flex flex-wrap justify-center gap-3">
+                {devices.map((d, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-muted font-semibold">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CHIC_COLORS[i % CHIC_COLORS.length] }} />
+                    {d.device_type}: {d.views}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tables */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Top Pages */}
+          <div className="animate-fade-in rounded-2xl border border-card-border bg-card overflow-hidden shadow-md" style={{ animationDelay: "300ms" }}>
+            <div className="p-5 border-b border-card-border flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted" />
+              <h2 className="text-xs font-bold text-muted uppercase tracking-wider">Top Pages</h2>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {pages.map((page, i) => (
+                <div key={i} className="flex items-center justify-between px-5 py-3.5 hover:bg-background/40 transition-colors">
+                  <span className="text-sm text-foreground/90 font-mono truncate max-w-[250px]">{page.path}</span>
+                  <span className="text-sm font-bold text-muted tabular-nums">{page.views}</span>
+                </div>
+              ))}
+              {pages.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-muted">No page data yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Top Referrers */}
+          <div className="animate-fade-in rounded-2xl border border-card-border bg-card overflow-hidden shadow-md" style={{ animationDelay: "350ms" }}>
+            <div className="p-5 border-b border-card-border flex items-center gap-2">
+              <Globe className="h-4 w-4 text-muted" />
+              <h2 className="text-xs font-bold text-muted uppercase tracking-wider">Traffic Sources</h2>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {referrers.map((ref, i) => (
+                <div key={i} className="flex items-center justify-between px-5 py-3.5 hover:bg-background/40 transition-colors">
+                  <span className="text-sm text-foreground/90 truncate max-w-[250px]">{ref.referrer}</span>
+                  <span className="text-sm font-bold text-muted tabular-nums">{ref.views}</span>
+                </div>
+              ))}
+              {referrers.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-muted">No referrer data yet</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// KPI Card Component
+function KpiCard({
+  title,
+  value,
+  icon,
+  live,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  live?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-card-border bg-card p-5 hover:border-accent/40 shadow-sm transition-all duration-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="rounded-xl border border-card-border bg-background/50 p-2.5 text-accent">
+          {icon}
+        </div>
+        {live && (
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-foreground tabular-nums">{value.toLocaleString()}</p>
+      <p className="text-[10px] font-bold text-muted mt-0.5 uppercase tracking-wide">{title}</p>
+    </div>
+  );
+}

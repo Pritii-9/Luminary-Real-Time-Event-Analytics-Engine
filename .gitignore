@@ -1,2 +1,26 @@
+# Environment files
 .env*
+!.env.example
+
+# Audit
 luminary_audit*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# SQLite data
+backend/data/
+*.db
+
+# Node
+node_modules/
+.next/
+
+# IDE
+.vscode/
+.idea/
+
+# GeoIP
+*.mmdb

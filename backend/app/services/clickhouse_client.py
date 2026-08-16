@@ -1,15 +1,14 @@
+import threading
 import clickhouse_connect
 
 from app.core.config import settings
 
-_client = None
+_local = threading.local()
 
 
 def get_clickhouse_client():
-    global _client
-
-    if _client is None:
-        _client = clickhouse_connect.get_client(
+    if not hasattr(_local, "client"):
+        _local.client = clickhouse_connect.get_client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_port,
             username=settings.clickhouse_user,
@@ -19,4 +18,4 @@ def get_clickhouse_client():
             verify=False,
         )
 
-    return _client
+    return _local.client

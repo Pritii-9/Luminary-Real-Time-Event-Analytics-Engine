@@ -1,3 +1,5 @@
+"""Stream worker: consumes events from Redis, enriches, and batch-inserts into ClickHouse."""
+
 import json
 import time
 from datetime import datetime, timezone
@@ -6,6 +8,9 @@ import clickhouse_connect
 from redis import Redis
 
 from app.core.config import settings
+from app.services.enrichment.user_agent import parse_user_agent
+from app.services.enrichment.bot import is_bot
+from app.services.enrichment.geo import enrich_geo
 
 STREAM_KEY = settings.redis_stream_key
 GROUP_NAME = "luminary-workers"
@@ -35,11 +40,23 @@ CLICKHOUSE_COLUMNS = [
     "referrer",
     "device_type",
     "browser",
+    "browser_version",
     "os",
+    "os_version",
     "screen",
     "session_id",
     "visitor_id",
     "ip_hash",
+    "country",
+    "city",
+    "language",
+    "timezone",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "is_bot",
 ]
 
 
@@ -59,38 +76,6 @@ def ensure_consumer_group():
             raise
 
 
-def parse_user_agent(user_agent: str):
-    browser, os_name, device_type = "Unknown", "Unknown", "desktop"
-    ua = user_agent.lower()
-
-    if "edg" in ua:
-        browser = "Edge"
-    elif "chrome" in ua:
-        browser = "Chrome"
-    elif "firefox" in ua:
-        browser = "Firefox"
-    elif "safari" in ua:
-        browser = "Safari"
-
-    if "windows" in ua:
-        os_name = "Windows"
-    elif "android" in ua:
-        os_name = "Android"
-    elif "iphone" in ua or "ipad" in ua:
-        os_name = "iOS"
-    elif "macintosh" in ua:
-        os_name = "macOS"
-    elif "linux" in ua:
-        os_name = "Linux"
-
-    if "mobile" in ua:
-        device_type = "mobile"
-    elif "tablet" in ua:
-        device_type = "tablet"
-
-    return browser, os_name, device_type
-
-
 def process_messages(messages):
     rows = []
     ack_ids = []
@@ -103,7 +88,16 @@ def process_messages(messages):
             dt = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
 
             user_agent = payload.get("user_agent", "")
-            browser, os_name, device_type = parse_user_agent(user_agent)
+
+            # Enrichment: User-Agent
+            ua_info = parse_user_agent(user_agent)
+
+            # Enrichment: Bot detection
+            bot_flag = 1 if is_bot(user_agent) else 0
+
+            # Enrichment: GeoIP (uses client_ip, never stored raw)
+            client_ip = payload.get("client_ip", "")
+            geo = enrich_geo(client_ip)
 
             row = (
                 payload.get("event_id"),
@@ -114,13 +108,25 @@ def process_messages(messages):
                 payload.get("path", ""),
                 payload.get("url", ""),
                 payload.get("referrer", ""),
-                device_type,
-                browser,
-                os_name,
+                ua_info["device_type"],
+                ua_info["browser"],
+                ua_info["browser_version"],
+                ua_info["os"],
+                ua_info["os_version"],
                 payload.get("screen", ""),
                 payload.get("session_id"),
                 payload.get("visitor_id"),
                 payload.get("ip_hash", ""),
+                geo["country"],
+                geo["city"],
+                payload.get("language", ""),
+                payload.get("timezone", ""),
+                payload.get("utm_source", ""),
+                payload.get("utm_medium", ""),
+                payload.get("utm_campaign", ""),
+                payload.get("utm_term", ""),
+                payload.get("utm_content", ""),
+                bot_flag,
             )
 
             rows.append(row)
@@ -128,6 +134,11 @@ def process_messages(messages):
 
         except Exception as e:
             print(f"Error processing message {message_id}: {e}")
+            # Push to Dead-Letter Queue for inspection
+            dlq_payload = json.dumps(
+                {"message_id": message_id, "data": fields, "error": str(e)}
+            )
+            redis_client.rpush("luminary:events:dlq", dlq_payload)
             redis_client.xack(STREAM_KEY, GROUP_NAME, message_id)
 
     if rows:
@@ -136,9 +147,8 @@ def process_messages(messages):
             data=rows,
             column_names=CLICKHOUSE_COLUMNS,
         )
-
         redis_client.xack(STREAM_KEY, GROUP_NAME, *ack_ids)
-        print(f"[OK] Successfully inserted {len(rows)} events into ClickHouse Cloud!")
+        print(f"[OK] Inserted {len(rows)} enriched events into ClickHouse.")
 
 
 def run():

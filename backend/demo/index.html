@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luminary Tracker Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 2rem;
+    }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #38bdf8; }
+    p { color: #94a3b8; margin-bottom: 2rem; }
+    .card {
+      background: #1e293b; border-radius: 12px; padding: 2rem;
+      max-width: 600px; width: 100%; border: 1px solid #334155;
+    }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #f1f5f9; }
+    .nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .nav a {
+      background: #334155; color: #e2e8f0; padding: 0.5rem 1rem;
+      border-radius: 8px; text-decoration: none; font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    .nav a:hover { background: #475569; }
+    .log {
+      background: #0f172a; border-radius: 8px; padding: 1rem;
+      font-family: monospace; font-size: 0.8rem; color: #38bdf8;
+      max-height: 200px; overflow-y: auto; border: 1px solid #334155;
+    }
+    .badge {
+      display: inline-block; background: #059669; color: white;
+      padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+
+  <!-- Luminary Tracker — uses demo_public_token -->
+  <script src="http://localhost:8000/tracker.js?site=demo_public_token" defer></script>
+</head>
+<body>
+  <h1>⚡ Luminary Demo Site</h1>
+  <p>This page has the Luminary tracker embedded. Open your dashboard to see events flow in.</p>
+
+  <div class="card">
+    <span class="badge">Tracker Active</span>
+    <h2>Simulate SPA Navigation</h2>
+    <div class="nav">
+      <a href="#" onclick="navigate('/home')">Home</a>
+      <a href="#" onclick="navigate('/pricing')">Pricing</a>
+      <a href="#" onclick="navigate('/blog/fastapi')">Blog</a>
+      <a href="#" onclick="navigate('/about')">About</a>
+      <a href="#" onclick="navigate('/contact')">Contact</a>
+    </div>
+
+    <h2>Event Log</h2>
+    <div class="log" id="log">Waiting for events...</div>
+  </div>
+
+  <script>
+    var logEl = document.getElementById('log');
+
+    function log(msg) {
+      var line = document.createElement('div');
+      line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+      logEl.prepend(line);
+    }
+
+    function navigate(path) {
+      history.pushState({}, '', path);
+      log('Navigated to ' + path + ' (tracked via pushState)');
+    }
+
+    // Intercept the original sendBeacon to log it
+    var origBeacon = navigator.sendBeacon;
+    if (origBeacon) {
+      navigator.sendBeacon = function(url, data) {
+        log('sendBeacon → ' + url);
+        return origBeacon.call(navigator, url, data);
+      };
+    }
+
+    log('Page loaded — initial pageview tracked');
+  </script>
+</body>
+</html>

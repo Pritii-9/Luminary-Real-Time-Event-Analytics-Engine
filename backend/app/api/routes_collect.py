@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Response
 
 from app.schemas.event import EventIn
-from app.services.event_service import enrich_event, publish_event
+from app.services.event_service import enrich_event, publish_event, update_realtime
 
 router = APIRouter()
 
@@ -10,4 +10,5 @@ router = APIRouter()
 async def collect(event: EventIn, request: Request):
     payload = enrich_event(event, request)
     await publish_event(payload)
+    await update_realtime(payload)
     return Response(status_code=204)
