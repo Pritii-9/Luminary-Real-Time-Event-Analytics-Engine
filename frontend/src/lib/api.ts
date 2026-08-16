@@ -77,12 +77,26 @@ export interface AuthResponse {
 }
 
 export async function register(email: string, password: string) {
-  const data = await apiFetch<AuthResponse>("/api/v1/auth/register", {
+  return apiFetch<{ detail: string }>("/api/v1/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function verifyOtp(email: string, otp: string) {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+  });
   setToken(data.access_token);
   return data;
+}
+
+export async function resendOtp(email: string) {
+  return apiFetch<{ detail: string }>("/api/v1/auth/resend-otp", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function login(email: string, password: string) {

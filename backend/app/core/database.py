@@ -14,6 +14,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True, max_length=255)
     password_hash: str
+    is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -48,6 +49,14 @@ else:
 
 def create_tables():
     SQLModel.metadata.create_all(engine)
+    # Auto-migration: ensure is_verified exists
+    with SQLSession(engine) as session:
+        try:
+            from sqlalchemy import text
+            session.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
+            session.commit()
+        except Exception:
+            pass
 
 
 def get_session():

@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # GeoIP (optional MaxMind GeoLite2-City.mmdb path)
     geoip_db_path: str = ""
 
+    # SMTP Settings for OTP verification
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = "noreply@luminary.dev"
+
     class Config:
         env_file = (os.path.join(BASE_DIR, ".env"), ".env")
 
