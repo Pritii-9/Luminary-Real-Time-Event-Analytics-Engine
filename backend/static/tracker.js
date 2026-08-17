@@ -40,25 +40,6 @@
   var COLLECT_URL = (apiBase || window.location.origin) + "/api/v1/collect";
 
 
-  // --- Visitor / Session IDs (no cookies) ---
-  function uid() {
-    return "xxxxxxxx-xxxx-4xxx".replace(/x/g, function () {
-      return ((Math.random() * 16) | 0).toString(16);
-    });
-  }
-
-  var visitorId = localStorage.getItem("lum_vid");
-  if (!visitorId) {
-    visitorId = "v_" + uid();
-    localStorage.setItem("lum_vid", visitorId);
-  }
-
-  var sessionId = sessionStorage.getItem("lum_sid");
-  if (!sessionId) {
-    sessionId = "s_" + uid();
-    sessionStorage.setItem("lum_sid", sessionId);
-  }
-
   // --- Extract UTM params ---
   function getUtm() {
     var params = {};
@@ -86,12 +67,13 @@
       url: window.location.href,
       path: window.location.pathname,
       referrer: document.referrer || "",
-      session_id: sessionId,
-      visitor_id: visitorId,
+      session_id: "",
+      visitor_id: "",
       screen: screen.width + "x" + screen.height,
       language: navigator.language || "",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
     };
+
 
     // Merge UTMs
     for (var k in utm) payload[k] = utm[k];
@@ -115,18 +97,29 @@
   var lastPath = window.location.pathname;
   send();
 
+  function extractPath(urlArg) {
+    try {
+      if (typeof urlArg === "string" && urlArg) {
+        var a = document.createElement("a");
+        a.href = urlArg;
+        return a.pathname;
+      }
+    } catch (e) {}
+    return window.location.pathname;
+  }
+
   // --- SPA: Intercept pushState / replaceState ---
   function wrapHistory(method) {
     var orig = history[method];
+    if (typeof orig !== "function") return;
     history[method] = function () {
       var result = orig.apply(this, arguments);
-      var newPath = window.location.pathname;
-      if (newPath !== lastPath) {
-        lastPath = newPath;
-        // Small delay so the DOM has updated
+      var targetPath = extractPath(arguments[2]) || window.location.pathname;
+      if (targetPath !== lastPath) {
+        lastPath = targetPath;
         setTimeout(function () {
           send();
-        }, 50);
+        }, 100);
       }
       return result;
     };
@@ -139,9 +132,12 @@
     var newPath = window.location.pathname;
     if (newPath !== lastPath) {
       lastPath = newPath;
-      send();
+      setTimeout(function () {
+        send();
+      }, 100);
     }
   });
+
 
   // --- Expose global track function ---
   window.luminary = window.luminary || {};
@@ -152,4 +148,64 @@
       screen: data ? JSON.stringify(data) : (screen.width + "x" + screen.height),
     });
   };
+
+  // --- Session Replay Capture ---
+  var coords = [];
+  var lastX = 0;
+  var lastY = 0;
+  var isTracking = true;
+
+  document.addEventListener("mousemove", function (e) {
+    if (!isTracking) return;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!isTracking) return;
+    coords.push({
+      x: e.clientX,
+      y: e.clientY,
+      t: Date.now(),
+      type: "click"
+    });
+  });
+
+  var intervalId = setInterval(function () {
+    if (!isTracking) return;
+    var w = window.innerWidth || document.documentElement.clientWidth || 1;
+    var h = window.innerHeight || document.documentElement.clientHeight || 1;
+    coords.push({
+      x: Number((lastX / w).toFixed(4)),
+      y: Number((lastY / h).toFixed(4)),
+      t: Date.now(),
+      type: "move"
+    });
+  }, 100);
+
+  function flushReplay() {
+    if (!isTracking) return;
+    isTracking = false;
+    clearInterval(intervalId);
+    if (coords.length === 0) return;
+
+    var payload = {
+      site_id: token.startsWith("site_") ? token : undefined,
+      session_id: token + "_" + Date.now(),
+      path: window.location.pathname,
+      coordinates: coords
+    };
+
+    var REPLAY_URL = (apiBase || window.location.origin) + "/api/session-replay";
+    var blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    navigator.sendBeacon(REPLAY_URL, blob);
+  }
+
+  window.addEventListener("pagehide", flushReplay);
+  window.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") {
+      flushReplay();
+    }
+  });
 })();
+

@@ -78,7 +78,33 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     if not details:
         raise HTTPException(status_code=404, detail="Site not found or inactive")
 
+    # Automated AI Bot & Scraper Filter
+    user_agent = request.headers.get("user-agent", "")
+    known_ai_bots = ['ChatGPT-User', 'GPTBot', 'ClaudeBot', 'PerplexityBot', 'Anthropic-AI', 'Google-Extended', 'Applebot-Extended']
+    matched_bot = None
+    for bot in known_ai_bots:
+        if bot.lower() in user_agent.lower():
+            matched_bot = bot
+            break
+
+    if matched_bot:
+        try:
+            from app.core.database import BotTrafficLog
+            bot_log = BotTrafficLog(
+                site_id=details["site_id"],
+                bot_name=matched_bot,
+                target_url=str(event.url),
+                timestamp=int(datetime.datetime.utcnow().timestamp())
+            )
+            session.add(bot_log)
+            session.commit()
+            logging.info(f"Intercepted and logged AI bot traffic: {matched_bot}")
+        except Exception as exc:
+            logging.warning(f"Bot traffic log save failed: {exc}")
+        return Response(status_code=204)
+
     cleaned_registered = extract_domain(details["domain"])
+
 
     # 2. Validate payload URL domain
     payload_domain = extract_domain(event.url)
@@ -135,36 +161,40 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     # 5. Ingest event
     payload = enrich_event(event, request)
 
-    # Direct SQLite persistence (allows stats to work standalone without Redis/ClickHouse)
-    try:
-        from user_agents import parse
-        from app.core.database import EventRecord
-
-        ua_str = payload.get("user_agent", "")
-        ua = parse(ua_str)
-        dev_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
-        browser_name = ua.browser.family or "Chrome"
-
-        record = EventRecord(
-            event_id=payload.get("event_id"),
-            site_id=payload.get("site_id"),
-            event_type=payload.get("event_type", "pageview"),
-            timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
-            url=payload.get("url", ""),
-            path=payload.get("path", "/"),
-            referrer=payload.get("referrer", ""),
-            session_id=payload.get("session_id", ""),
-            visitor_id=payload.get("visitor_id", ""),
-            screen=payload.get("screen", ""),
-            device_type=dev_type,
-            browser=browser_name,
-            country="Unknown",
-        )
-        session.add(record)
-        session.commit()
-    except Exception as exc:
-        logging.warning(f"SQLite event persist warning: {exc}")
-
-    await publish_event(payload)
+    # Publish to Redis Queue
+    queue_success = await publish_event(payload)
     await update_realtime(payload)
+
+    # If Redis queue is unavailable, write directly to database as a synchronous fallback
+    if not queue_success:
+        try:
+            from user_agents import parse
+            from app.core.database import EventRecord
+
+            ua_str = payload.get("user_agent", "")
+            ua = parse(ua_str)
+            dev_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
+            browser_name = ua.browser.family or "Chrome"
+
+            record = EventRecord(
+                event_id=payload.get("event_id"),
+                site_id=payload.get("site_id"),
+                event_type=payload.get("event_type", "pageview"),
+                timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
+                url=payload.get("url", ""),
+                path=payload.get("path", "/"),
+                referrer=payload.get("referrer", ""),
+                session_id=payload.get("session_id", ""),
+                visitor_id=payload.get("visitor_id", ""),
+                screen=payload.get("screen", ""),
+                device_type=dev_type,
+                browser=browser_name,
+                country="Unknown",
+            )
+            session.add(record)
+            session.commit()
+            logging.info("Synched event to DB because Redis was offline.")
+        except Exception as exc:
+            logging.warning(f"Sync DB fallback ingest failed: {exc}")
+
     return Response(status_code=204)

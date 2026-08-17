@@ -56,6 +56,25 @@ class EventRecord(SQLModel, table=True):
     country: str = Field(default="Unknown", max_length=64)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+class BotTrafficLog(SQLModel, table=True):
+    __tablename__ = "bot_traffic_logs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    site_id: str = Field(index=True, max_length=64)
+    bot_name: str = Field(max_length=64)
+    target_url: str = Field(max_length=512)
+    timestamp: int = Field(index=True)
+
+
+class SessionReplay(SQLModel, table=True):
+    __tablename__ = "session_replays"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    site_id: str = Field(index=True, max_length=64)
+    session_id: str = Field(index=True, max_length=64)
+    path: str = Field(max_length=255)
+    coordinates: str = Field(default="[]")  # stored as JSON string
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ---------------------------------------------------------------------------

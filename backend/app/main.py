@@ -10,8 +10,10 @@ from app.api.routes_sites import router as sites_router
 from app.api.routes_stats import router as stats_router
 from app.api.routes_tracker import router as tracker_router
 from app.api.routes_billing import router as billing_router
+from app.api.routes_replay import router as replay_router
 from app.core.config import settings
 from app.core.database import create_tables
+
 
 
 @asynccontextmanager
@@ -50,6 +52,8 @@ app.include_router(stats_router)
 app.include_router(realtime_router)
 app.include_router(tracker_router)
 app.include_router(billing_router)
+app.include_router(replay_router)
+
 
 
 @app.get("/health")

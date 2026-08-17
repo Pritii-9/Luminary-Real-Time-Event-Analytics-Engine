@@ -11,8 +11,14 @@ from app.services.redis_client import redis_client
 router = APIRouter(prefix="/api/v1/realtime", tags=["realtime"])
 
 
+_redis_disabled_until = 0
+
 async def _get_active_count(site_id: str) -> int:
     """Get active visitor count from Redis sorted set after pruning old entries."""
+    global _redis_disabled_until
+    if time.time() < _redis_disabled_until:
+        return 0
+
     key = f"realtime:{site_id}"
     cutoff = time.time() - 300  # 5 minutes
     try:
@@ -20,7 +26,9 @@ async def _get_active_count(site_id: str) -> int:
         count = await redis_client.zcard(key)
         return count
     except Exception:
+        _redis_disabled_until = time.time() + 30
         return 0
+
 
 
 

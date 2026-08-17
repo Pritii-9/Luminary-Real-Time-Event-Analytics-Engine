@@ -16,6 +16,8 @@ def get_clickhouse_client():
             database="analytics",
             secure=settings.clickhouse_secure,
             verify=False,
+            connect_timeout=0.5,
+            send_receive_timeout=0.5,
         )
 
-    return _local.client
+    return _local.client

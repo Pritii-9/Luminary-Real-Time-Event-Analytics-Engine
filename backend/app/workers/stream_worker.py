@@ -19,15 +19,24 @@ BATCH_SIZE = 100
 
 redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
 
-clickhouse_client = clickhouse_connect.get_client(
-    host=settings.clickhouse_host,
-    port=settings.clickhouse_port,
-    username=settings.clickhouse_user,
-    password=settings.clickhouse_password,
-    database="analytics",
-    secure=settings.clickhouse_secure,
-    verify=False,
-)
+clickhouse_client = None
+try:
+    if settings.clickhouse_host:
+        clickhouse_client = clickhouse_connect.get_client(
+            host=settings.clickhouse_host,
+            port=settings.clickhouse_port,
+            username=settings.clickhouse_user,
+            password=settings.clickhouse_password,
+            database="analytics",
+            secure=settings.clickhouse_secure,
+            verify=False,
+            connect_timeout=1.0,
+            send_receive_timeout=1.0,
+        )
+        print("ClickHouse Cloud client initialized successfully.")
+except Exception as e:
+    print(f"ClickHouse Cloud connection failed (will fallback to SQL database): {e}")
+
 
 CLICKHOUSE_COLUMNS = [
     "event_id",
@@ -142,13 +151,53 @@ def process_messages(messages):
             redis_client.xack(STREAM_KEY, GROUP_NAME, message_id)
 
     if rows:
-        clickhouse_client.insert(
-            table="analytics.events",
-            data=rows,
-            column_names=CLICKHOUSE_COLUMNS,
-        )
+        inserted_to_ch = False
+        if clickhouse_client:
+            try:
+                clickhouse_client.insert(
+                    table="analytics.events",
+                    data=rows,
+                    column_names=CLICKHOUSE_COLUMNS,
+                )
+                inserted_to_ch = True
+                print(f"[OK] Inserted {len(rows)} enriched events into ClickHouse.")
+            except Exception as e:
+                print(f"ClickHouse batch insert failed, falling back to SQL: {e}")
+
+        if not inserted_to_ch:
+            # SQL Database batch insert (PostgreSQL or SQLite)
+            try:
+                from app.core.database import EventRecord, engine
+                from sqlmodel import Session as SQLSession
+                
+                db_records = []
+                for r in rows:
+                    db_records.append(EventRecord(
+                        event_id=r[0],
+                        site_id=r[3],
+                        event_type=r[4],
+                        timestamp=int(r[2].replace(tzinfo=timezone.utc).timestamp()),
+                        url=r[6],
+                        path=r[5],
+                        referrer=r[7],
+                        device_type=r[8],
+                        browser=r[9],
+                        screen=r[13],
+                        session_id=r[14],
+                        visitor_id=r[15],
+                        country=r[17] if len(r) > 17 else "Unknown"
+                    ))
+                with SQLSession(engine) as session:
+                    session.add_all(db_records)
+                    session.commit()
+                print(f"[OK] Batch-inserted {len(rows)} events into SQL Database.")
+            except Exception as e:
+                print(f"SQL Database batch insert failed: {e}")
+                # We do not acknowledge (xack) so it can be retried or debugged
+                raise
+
         redis_client.xack(STREAM_KEY, GROUP_NAME, *ack_ids)
-        print(f"[OK] Inserted {len(rows)} enriched events into ClickHouse.")
+
 
 
 def run():
