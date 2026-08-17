@@ -183,6 +183,13 @@ export async function fetchCountries(siteId: string, days = 7) {
   return apiFetch(`/api/v1/stats/countries?site_id=${siteId}&days=${days}`);
 }
 
+export async function fetchCustomEvents(siteId: string, days = 7) {
+  return apiFetch<{ event_name: string; count: number; unique_visitors: number }[]>(
+    `/api/v1/stats/custom-events?site_id=${siteId}&days=${days}`
+  );
+}
+
+
 // ---------------------------------------------------------------------------
 // Realtime API
 // ---------------------------------------------------------------------------

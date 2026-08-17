@@ -1,7 +1,7 @@
 """Auth API routes: register, login, logout, me, verify-otp, resend-otp."""
 
 import random
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from pydantic import BaseModel
 from sqlmodel import Session as SQLSession, select
 
@@ -14,6 +14,7 @@ from app.core.auth import (
 from app.core.database import User, get_session
 from app.services.redis_client import redis_client
 from app.services.email_service import send_otp_email
+from app.services.rate_limiter import is_rate_limited
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -53,7 +54,11 @@ class MessageResponse(BaseModel):
 
 
 @router.post("/register", response_model=MessageResponse)
-async def register(body: RegisterRequest, session: SQLSession = Depends(get_session)):
+async def register(body: RegisterRequest, request: Request, session: SQLSession = Depends(get_session)):
+    # Rate limit: Max 5 registration attempts per 5 minutes per IP
+    if await is_rate_limited(request, "auth_register", limit=5, window_seconds=300):
+        raise HTTPException(status_code=429, detail="Too many registration attempts. Please try again later.")
+
     existing = session.exec(select(User).where(User.email == body.email)).first()
     if existing:
         if existing.is_verified:
@@ -81,7 +86,11 @@ async def register(body: RegisterRequest, session: SQLSession = Depends(get_sess
 
 
 @router.post("/verify-otp", response_model=TokenResponse)
-async def verify_otp(body: VerifyOTPRequest, response: Response, session: SQLSession = Depends(get_session)):
+async def verify_otp(body: VerifyOTPRequest, request: Request, response: Response, session: SQLSession = Depends(get_session)):
+    # Rate limit: Max 10 OTP validation attempts per 1 minute per IP (prevents brute forcing)
+    if await is_rate_limited(request, "auth_verify_otp", limit=10, window_seconds=60):
+        raise HTTPException(status_code=429, detail="Too many verification attempts. Please try again later.")
+
     user = session.exec(select(User).where(User.email == body.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -122,7 +131,11 @@ async def verify_otp(body: VerifyOTPRequest, response: Response, session: SQLSes
 
 
 @router.post("/resend-otp", response_model=MessageResponse)
-async def resend_otp(body: ResendOTPRequest, session: SQLSession = Depends(get_session)):
+async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSession = Depends(get_session)):
+    # Rate limit: Max 3 OTP resends per 5 minutes per IP
+    if await is_rate_limited(request, "auth_resend_otp", limit=3, window_seconds=300):
+        raise HTTPException(status_code=429, detail="Too many resend attempts. Please try again later.")
+
     user = session.exec(select(User).where(User.email == body.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

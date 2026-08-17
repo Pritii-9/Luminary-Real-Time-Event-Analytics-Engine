@@ -26,7 +26,7 @@ for i in range(20):
     payload = {
         "site_id": "site_123",
         "event_type": "pageview",
-        "url": f"https://example.com{random.choice(paths)}",
+        "url": f"https://testblog.com{random.choice(paths)}",
         "path": random.choice(paths),
         "referrer": random.choice(referrers),
         "session_id": f"sess_{i % 5}",

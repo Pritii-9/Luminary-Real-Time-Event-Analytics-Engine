@@ -234,3 +234,31 @@ def get_countries(site_id: str, days: int):
     data = _rows_to_dicts(result)
     set_cached(site_id, "countries", days, data)
     return data
+
+
+# ---------------------------------------------------------------------------
+# Custom Events
+# ---------------------------------------------------------------------------
+
+def get_custom_events(site_id: str, days: int):
+    cached = get_cached(site_id, "custom_events", days)
+    if cached is not None:
+        return cached
+
+    query = """
+        SELECT
+            path AS event_name,
+            count() AS count,
+            uniq(visitor_id) AS unique_visitors
+        FROM analytics.events
+        WHERE site_id = {site_id:String}
+          AND event_type = 'custom'
+          AND event_date >= today() - {days:Int32}
+        GROUP BY event_name
+        ORDER BY count DESC
+        LIMIT 50
+    """
+    result = _query(query, {"site_id": site_id, "days": days})
+    data = _rows_to_dicts(result)
+    set_cached(site_id, "custom_events", days, data)
+    return data

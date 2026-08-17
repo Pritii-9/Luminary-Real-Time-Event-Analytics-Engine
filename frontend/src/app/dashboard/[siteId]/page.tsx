@@ -9,6 +9,7 @@ import {
   fetchReferrers,
   fetchDevices,
   fetchActiveUsers,
+  fetchCustomEvents,
   getSite,
   getToken,
   SiteData,
@@ -33,6 +34,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
   const [pages, setPages] = useState<any[]>([]);
   const [referrers, setReferrers] = useState<any[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
+  const [customEvents, setCustomEvents] = useState<any[]>([]);
   const [activeVisitors, setActiveVisitors] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
@@ -60,7 +62,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
   async function loadData() {
     setLoading(true);
     try {
-      const [siteData, sumData, tsData, pgData, refData, devData, activeData] =
+      const [siteData, sumData, tsData, pgData, refData, devData, activeData, customData] =
         await Promise.all([
           getSite(siteId),
           fetchSummary(siteId, days),
@@ -69,6 +71,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
           fetchReferrers(siteId, days),
           fetchDevices(siteId, days),
           fetchActiveUsers(siteId),
+          fetchCustomEvents(siteId, days),
         ]);
 
       setSite(siteData);
@@ -77,6 +80,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
       if (pgData) setPages(pgData);
       if (refData) setReferrers(refData);
       if (devData) setDevices(devData);
+      if (customData) setCustomEvents(customData);
       setActiveVisitors(activeData?.active_visitors || 0);
     } catch (err) {
       console.error("Dashboard load error", err);
@@ -255,6 +259,42 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
               ))}
               {referrers.length === 0 && (
                 <div className="px-5 py-8 text-center text-sm text-muted">No referrer data yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Custom Events / Goals */}
+          <div className="animate-fade-in rounded-2xl border border-card-border bg-card overflow-hidden shadow-md col-span-1 lg:col-span-2" style={{ animationDelay: "400ms" }}>
+            <div className="p-5 border-b border-card-border flex items-center gap-2">
+              <Zap className="h-4 w-4 text-accent" />
+              <h2 className="text-xs font-bold text-muted uppercase tracking-wider">Conversion Goals & Custom Events</h2>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {customEvents.length > 0 ? (
+                <div className="grid grid-cols-12 gap-4 px-5 py-3 text-xs font-bold text-muted uppercase tracking-wider bg-background/20">
+                  <span className="col-span-6">Goal / Event Name</span>
+                  <span className="col-span-2 text-right">Triggers</span>
+                  <span className="col-span-2 text-right">Unique Users</span>
+                  <span className="col-span-2 text-right">Conversion Rate</span>
+                </div>
+              ) : null}
+              {customEvents.map((event, i) => {
+                const convRate = summary?.visitors
+                  ? ((event.unique_visitors / summary.visitors) * 100).toFixed(1)
+                  : "0.0";
+                return (
+                  <div key={i} className="grid grid-cols-12 gap-4 items-center px-5 py-3.5 hover:bg-background/40 transition-colors">
+                    <span className="col-span-6 text-sm font-bold text-foreground/90 font-mono truncate">{event.event_name}</span>
+                    <span className="col-span-2 text-sm font-semibold text-muted text-right tabular-nums">{event.count.toLocaleString()}</span>
+                    <span className="col-span-2 text-sm font-semibold text-muted text-right tabular-nums">{event.unique_visitors.toLocaleString()}</span>
+                    <span className="col-span-2 text-sm font-bold text-accent text-right tabular-nums">{convRate}%</span>
+                  </div>
+                );
+              })}
+              {customEvents.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-muted">
+                  No custom events recorded yet. Use <code className="font-mono text-accent bg-accent/5 px-1.5 py-0.5 rounded">window.luminary.track("event_name")</code> in your code to track conversion goals.
+                </div>
               )}
             </div>
           </div>

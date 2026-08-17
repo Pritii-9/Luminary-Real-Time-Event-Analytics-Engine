@@ -6,6 +6,7 @@ import { login, register, getToken, verifyOtp, resendOtp } from "@/lib/api";
 import { Mail, Lock, Eye, EyeOff, User, Building2, ArrowRight } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
   return (
@@ -175,9 +176,7 @@ function AuthPageContent() {
         
         {/* Brand Header */}
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="h-11 w-11 rounded-xl bg-accent flex items-center justify-center shadow-md mb-3 transition-colors duration-200">
-            <span className="text-background font-extrabold text-xl tracking-tighter">L</span>
-          </div>
+          <Logo className="h-11 w-11 mb-3 transition-colors duration-200" />
           <h1 className="text-2xl font-bold text-foreground">
             Luminary Analytics
           </h1>

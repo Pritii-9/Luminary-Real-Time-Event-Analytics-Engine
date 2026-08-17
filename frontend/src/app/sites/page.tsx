@@ -7,6 +7,7 @@ import { Globe, Plus, LogOut, ExternalLink, BarChart3 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Logo from "@/components/Logo";
 
 export default function SitesPage() {
   const router = useRouter();
@@ -82,9 +83,7 @@ export default function SitesPage() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center shadow-md shadow-accent/5">
-              <span className="text-background font-extrabold text-lg">L</span>
-            </div>
+            <Logo className="h-9 w-9" />
             <div>
               <h1 className="text-2xl font-bold text-foreground">Your Sites</h1>
               <p className="text-sm text-muted">{userEmail}</p>

@@ -139,4 +139,14 @@
       send();
     }
   });
+
+  // --- Expose global track function ---
+  window.luminary = window.luminary || {};
+  window.luminary.track = function (eventName, data) {
+    send({
+      event_type: "custom",
+      path: eventName,
+      screen: data ? JSON.stringify(data) : (screen.width + "x" + screen.height),
+    });
+  };
 })();
