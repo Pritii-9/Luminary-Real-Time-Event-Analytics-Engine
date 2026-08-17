@@ -79,8 +79,9 @@
     var utm = getUtm();
     var payload = {
       public_token: token,
-      site_id: token,
+      site_id: token.startsWith("site_") ? token : undefined,
       event_type: "pageview",
+
 
       url: window.location.href,
       path: window.location.pathname,
@@ -99,17 +100,15 @@
 
     var data = JSON.stringify(payload);
 
-    // Use sendBeacon if available, else fetch with keepalive
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(COLLECT_URL, new Blob([data], { type: "application/json" }));
-    } else {
-      fetch(COLLECT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: data,
-        keepalive: true,
-      }).catch(function () {});
-    }
+    // Send telemetry via fetch with keepalive
+    fetch(COLLECT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: data,
+      keepalive: true,
+    }).catch(function () {});
+
+
   }
 
   // --- Track initial pageview ---

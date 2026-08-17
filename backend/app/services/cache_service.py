@@ -7,7 +7,8 @@ from redis import Redis
 
 from app.core.config import settings
 
-_sync_redis = Redis.from_url(settings.redis_url, decode_responses=True)
+_sync_redis = Redis.from_url(settings.redis_url, socket_timeout=1, socket_connect_timeout=1, decode_responses=True)
+
 
 DEFAULT_TTL = 60  # seconds
 

@@ -37,6 +37,27 @@ class Site(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class EventRecord(SQLModel, table=True):
+    __tablename__ = "event_records"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(index=True, max_length=64)
+    site_id: str = Field(index=True, max_length=64)
+    event_type: str = Field(default="pageview", max_length=32)
+    timestamp: int = Field(index=True)
+    url: str = Field(default="")
+    path: str = Field(index=True, max_length=255)
+    referrer: str = Field(default="", max_length=255)
+    session_id: str = Field(index=True, max_length=64)
+    visitor_id: str = Field(index=True, max_length=64)
+    screen: str = Field(default="", max_length=32)
+    device_type: str = Field(default="desktop", max_length=32)
+    browser: str = Field(default="Chrome", max_length=32)
+    country: str = Field(default="Unknown", max_length=64)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+
 # ---------------------------------------------------------------------------
 # Engine & session helpers
 # ---------------------------------------------------------------------------

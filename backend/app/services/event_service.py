@@ -90,6 +90,5 @@ async def publish_event(payload: dict) -> None:
             maxlen=100000,
             approximate=True,
         )
-    except Exception as exc:
-        logging.exception("Failed to publish event to Redis")
-        raise HTTPException(status_code=503, detail="Redis unavailable") from exc
+    except Exception:
+        logging.warning("Redis stream unavailable, skipping queue publishing")

@@ -44,8 +44,9 @@ async def get_site_details(site_id: str | None, public_token: str | None, sessio
     site = None
     if site_id:
         site = session.exec(select(Site).where(Site.site_id == site_id)).first()
-    elif public_token:
+    if not site and public_token:
         site = session.exec(select(Site).where(Site.public_token == public_token)).first()
+
 
     if not site:
         return None
@@ -133,6 +134,37 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
 
     # 5. Ingest event
     payload = enrich_event(event, request)
+
+    # Direct SQLite persistence (allows stats to work standalone without Redis/ClickHouse)
+    try:
+        from user_agents import parse
+        from app.core.database import EventRecord
+
+        ua_str = payload.get("user_agent", "")
+        ua = parse(ua_str)
+        dev_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
+        browser_name = ua.browser.family or "Chrome"
+
+        record = EventRecord(
+            event_id=payload.get("event_id"),
+            site_id=payload.get("site_id"),
+            event_type=payload.get("event_type", "pageview"),
+            timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
+            url=payload.get("url", ""),
+            path=payload.get("path", "/"),
+            referrer=payload.get("referrer", ""),
+            session_id=payload.get("session_id", ""),
+            visitor_id=payload.get("visitor_id", ""),
+            screen=payload.get("screen", ""),
+            device_type=dev_type,
+            browser=browser_name,
+            country="Unknown",
+        )
+        session.add(record)
+        session.commit()
+    except Exception as exc:
+        logging.warning(f"SQLite event persist warning: {exc}")
+
     await publish_event(payload)
     await update_realtime(payload)
     return Response(status_code=204)
