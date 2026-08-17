@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 from urllib.parse import urlparse
 from sqlmodel import Session, select
+import json
+import datetime
+import logging
 
 from app.schemas.event import EventIn
 from app.services.event_service import enrich_event, publish_event, update_realtime
-from app.core.database import get_session, Site
+from app.core.database import get_session, Site, User
 from app.services.redis_client import redis_client
 from app.services.rate_limiter import is_rate_limited
 
@@ -26,15 +29,15 @@ def extract_domain(url: str) -> str:
     except Exception:
         return ""
 
-async def get_site_domain(site_id: str | None, public_token: str | None, session: Session) -> str:
+async def get_site_details(site_id: str | None, public_token: str | None, session: Session) -> dict | None:
     if not site_id and not public_token:
-        return ""
+        return None
         
-    cache_key = f"site_domain:{site_id or public_token}"
+    cache_key = f"site_details:{site_id or public_token}"
     try:
         cached = await redis_client.get(cache_key)
         if cached:
-            return cached.decode("utf-8")
+            return json.loads(cached.decode("utf-8"))
     except Exception:
         pass
 
@@ -45,14 +48,23 @@ async def get_site_domain(site_id: str | None, public_token: str | None, session
         site = session.exec(select(Site).where(Site.public_token == public_token)).first()
 
     if not site:
-        return ""
+        return None
+
+    owner = session.exec(select(User).where(User.id == site.user_id)).first()
+    limit = owner.monthly_pageview_limit if owner else 10000
+
+    details = {
+        "domain": site.domain,
+        "site_id": site.site_id,
+        "monthly_pageview_limit": limit
+    }
 
     try:
-        await redis_client.set(cache_key, site.domain, ex=3600)
+        await redis_client.set(cache_key, json.dumps(details), ex=3600)
     except Exception:
         pass
 
-    return site.domain
+    return details
 
 @router.post("/api/v1/collect", status_code=204)
 async def collect(event: EventIn, request: Request, session: Session = Depends(get_session)):
@@ -60,12 +72,12 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     if await is_rate_limited(request, "collect", limit=60, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many events sent. Please slow down.")
 
-    # 1. Fetch registered site domain (from Redis cache or DB)
-    registered_domain = await get_site_domain(event.site_id, event.public_token, session)
-    if not registered_domain:
+    # 1. Fetch registered site details (from Redis cache or DB)
+    details = await get_site_details(event.site_id, event.public_token, session)
+    if not details:
         raise HTTPException(status_code=404, detail="Site not found or inactive")
 
-    cleaned_registered = extract_domain(registered_domain)
+    cleaned_registered = extract_domain(details["domain"])
 
     # 2. Validate payload URL domain
     payload_domain = extract_domain(event.url)
@@ -86,7 +98,32 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
         if origin_domain != cleaned_registered and not origin_domain.endswith("." + cleaned_registered):
             raise HTTPException(status_code=403, detail="Forbidden: HTTP Origin mismatch")
 
-    # 4. Ingest event
+    # 4. Check and increment quota limit
+    # Key format: quota:{site_id}:{year}-{month}
+    now = datetime.datetime.utcnow()
+    month_str = now.strftime("%Y-%m")
+    quota_key = f"quota:{details['site_id']}:{month_str}"
+    
+    try:
+        current_usage = await redis_client.get(quota_key)
+        if current_usage and int(current_usage) >= details["monthly_pageview_limit"]:
+            raise HTTPException(
+                status_code=402, 
+                detail="Monthly event quota exceeded. Please upgrade your subscription plan."
+            )
+            
+        # Increment quota and set expiration of 35 days (covers next month start)
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.incr(quota_key)
+            if not current_usage:
+                await pipe.expire(quota_key, 35 * 86400)
+            await pipe.execute()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.error(f"Quota check error for site {details['site_id']}: {exc}")
+
+    # 5. Ingest event
     payload = enrich_event(event, request)
     await publish_event(payload)
     await update_realtime(payload)

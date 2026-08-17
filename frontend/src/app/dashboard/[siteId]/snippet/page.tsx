@@ -2,10 +2,13 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { getSnippet, getSite, getToken, SiteData } from "@/lib/api";
+import { getSnippet, getSite, getMe, logout, getToken, createPortalSession, SiteData } from "@/lib/api";
 import { ArrowLeft, Copy, Code } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
+import UserDropdown from "@/components/UserDropdown";
+import AccountSettingsModal from "@/components/AccountSettingsModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function SnippetPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = use(params);
@@ -14,6 +17,13 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
   const [snippet, setSnippet] = useState("");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // User details state
+  const [userEmail, setUserEmail] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [limit, setLimit] = useState(10000);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -25,12 +35,18 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
 
   async function loadData() {
     try {
-      const [siteData, snippetData] = await Promise.all([
+      const [siteData, snippetData, userData] = await Promise.all([
         getSite(siteId),
         getSnippet(siteId),
+        getMe().catch(() => null),
       ]);
       setSite(siteData);
       setSnippet(snippetData.snippet);
+      if (userData) {
+        setUserEmail(userData.email);
+        setPlan(userData.plan);
+        setLimit(userData.monthly_pageview_limit);
+      }
     } catch {
       router.push("/sites");
     } finally {
@@ -58,7 +74,7 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
     <div className="min-h-screen p-6 md:p-8 bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto max-w-3xl animate-fade-in">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="relative z-30 mb-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/dashboard/${siteId}`)}
@@ -71,7 +87,24 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
               <p className="text-sm text-muted">{site?.name} · {site?.domain}</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <UserDropdown
+              email={userEmail}
+              plan={plan}
+              limit={limit}
+              onManageBilling={async () => {
+                try {
+                  const res = await createPortalSession();
+                  if (res?.portal_url) window.location.href = res.portal_url;
+                } catch (err) {
+                  console.error("Portal error", err);
+                }
+              }}
+              onAccountSettings={() => setShowAccountSettings(true)}
+              onLogout={() => setShowConfirmLogout(true)}
+            />
+          </div>
         </div>
 
         {/* Instructions */}
@@ -130,6 +163,38 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
           </div>
         </div>
       </div>
+
+      {/* Account Settings Modal */}
+      <AccountSettingsModal
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        email={userEmail}
+        plan={plan}
+        limit={limit}
+        onManageBilling={async () => {
+          try {
+            const res = await createPortalSession();
+            if (res?.portal_url) window.location.href = res.portal_url;
+          } catch (err) {
+            console.error("Portal error", err);
+          }
+        }}
+      />
+
+      {/* Confirm Logout Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out of your Luminary Analytics workspace?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          setShowConfirmLogout(false);
+          await logout();
+          router.push("/login");
+        }}
+        onCancel={() => setShowConfirmLogout(false)}
+      />
 
       {/* Dynamic Toast Notifications */}
       {toast && (

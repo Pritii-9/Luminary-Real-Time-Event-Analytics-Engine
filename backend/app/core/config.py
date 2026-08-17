@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     redis_stream_key: str = "events:raw"
     redis_stream_maxlen: int = 100000
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:8000,http://127.0.0.1:8000"
+
 
     # ClickHouse settings
     clickhouse_host: str = "localhost"
@@ -35,6 +36,13 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_sender: str = "noreply@luminary.dev"
+
+    # Stripe Settings
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_pro_price_id: str = "price_mock_pro"
+    stripe_enterprise_price_id: str = "price_mock_enterprise"
+    frontend_url: str = "http://localhost:3001"
 
     class Config:
         env_file = (os.path.join(BASE_DIR, ".env"), ".env")

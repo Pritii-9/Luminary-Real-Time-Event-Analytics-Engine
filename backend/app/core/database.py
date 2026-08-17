@@ -16,6 +16,13 @@ class User(SQLModel, table=True):
     password_hash: str
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Subscription & Billing
+    plan: str = Field(default="free", max_length=32)
+    stripe_customer_id: Optional[str] = Field(default=None, max_length=255)
+    stripe_subscription_id: Optional[str] = Field(default=None, max_length=255)
+    subscription_status: Optional[str] = Field(default="active", max_length=32)
+    monthly_pageview_limit: int = Field(default=10000)
 
 
 class Site(SQLModel, table=True):
@@ -49,14 +56,46 @@ else:
 
 def create_tables():
     SQLModel.metadata.create_all(engine)
-    # Auto-migration: ensure is_verified exists
+    
+    # Self-healing migrations for SQLite / PostgreSQL
     with SQLSession(engine) as session:
+        from sqlalchemy import text
+        
         try:
-            from sqlalchemy import text
             session.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
             session.commit()
         except Exception:
-            pass
+            session.rollback()
+
+        try:
+            session.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR(32) DEFAULT 'free'"))
+            session.commit()
+        except Exception:
+            session.rollback()
+
+        try:
+            session.execute(text("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255) DEFAULT NULL"))
+            session.commit()
+        except Exception:
+            session.rollback()
+
+        try:
+            session.execute(text("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255) DEFAULT NULL"))
+            session.commit()
+        except Exception:
+            session.rollback()
+
+        try:
+            session.execute(text("ALTER TABLE users ADD COLUMN subscription_status VARCHAR(32) DEFAULT 'active'"))
+            session.commit()
+        except Exception:
+            session.rollback()
+
+        try:
+            session.execute(text("ALTER TABLE users ADD COLUMN monthly_pageview_limit INTEGER DEFAULT 10000"))
+            session.commit()
+        except Exception:
+            session.rollback()
 
 
 def get_session():

@@ -114,7 +114,13 @@ export async function logout() {
 }
 
 export async function getMe() {
-  return apiFetch<{ id: number; email: string }>("/api/v1/auth/me");
+  return apiFetch<{
+    id: number;
+    email: string;
+    plan: string;
+    subscription_status: string;
+    monthly_pageview_limit: number;
+  }>("/api/v1/auth/me");
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +194,20 @@ export async function fetchCustomEvents(siteId: string, days = 7) {
     `/api/v1/stats/custom-events?site_id=${siteId}&days=${days}`
   );
 }
+
+export async function createCheckoutSession(plan: string) {
+  return apiFetch<{ checkout_url: string; is_mock: boolean }>("/api/v1/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export async function createPortalSession() {
+  return apiFetch<{ portal_url: string; is_mock: boolean }>("/api/v1/billing/portal", {
+    method: "POST",
+  });
+}
+
 
 
 // ---------------------------------------------------------------------------

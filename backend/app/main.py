@@ -9,6 +9,7 @@ from app.api.routes_realtime import router as realtime_router
 from app.api.routes_sites import router as sites_router
 from app.api.routes_stats import router as stats_router
 from app.api.routes_tracker import router as tracker_router
+from app.api.routes_billing import router as billing_router
 from app.core.config import settings
 from app.core.database import create_tables
 
@@ -27,10 +28,12 @@ origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 app.include_router(auth_router)
 app.include_router(collect_router)
@@ -38,6 +41,7 @@ app.include_router(sites_router)
 app.include_router(stats_router)
 app.include_router(realtime_router)
 app.include_router(tracker_router)
+app.include_router(billing_router)
 
 
 @app.get("/health")

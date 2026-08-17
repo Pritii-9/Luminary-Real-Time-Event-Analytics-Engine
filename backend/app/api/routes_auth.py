@@ -18,6 +18,9 @@ from app.services.rate_limiter import is_rate_limited
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+_otp_memory_store = {}
+
+
 
 class RegisterRequest(BaseModel):
     email: str
@@ -41,6 +44,9 @@ class ResendOTPRequest(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    plan: str
+    subscription_status: str
+    monthly_pageview_limit: int
 
 
 class TokenResponse(BaseModel):
@@ -74,10 +80,16 @@ async def register(body: RegisterRequest, request: Request, session: SQLSession 
         session.commit()
 
     # Generate 6-digit OTP
+    # Generate 6-digit OTP
     otp = f"{random.randint(100000, 999999)}"
 
-    # Save OTP to Redis (expires in 5 minutes)
-    await redis_client.set(f"otp:{body.email}", otp, ex=300)
+    # Save OTP to Redis (or in-memory fallback)
+    try:
+        await redis_client.set(f"otp:{body.email}", otp, ex=300)
+    except Exception as e:
+        import logging, time
+        logging.warning(f"Redis unavailable for OTP set: {e}")
+        _otp_memory_store[body.email] = (otp, time.time() + 300)
 
     # Send email (prints to console in development)
     send_otp_email(body.email, otp)
@@ -95,8 +107,24 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Check OTP in Redis
-    stored_otp = await redis_client.get(f"otp:{body.email}")
+    # Check OTP in Redis or memory store
+    stored_otp = None
+    try:
+        stored_otp = await redis_client.get(f"otp:{body.email}")
+    except Exception as e:
+        import logging
+        logging.warning(f"Redis unavailable for OTP get: {e}")
+
+    if not stored_otp:
+        import time
+        mem_item = _otp_memory_store.get(body.email)
+        if mem_item:
+            code, expires_at = mem_item
+            if time.time() < expires_at:
+                stored_otp = code
+            else:
+                _otp_memory_store.pop(body.email, None)
+
     if not stored_otp:
         raise HTTPException(status_code=400, detail="OTP expired or not found")
 
@@ -109,8 +137,12 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
     session.commit()
     session.refresh(user)
 
-    # Delete OTP from Redis
-    await redis_client.delete(f"otp:{body.email}")
+    # Delete OTP from Redis / memory store
+    try:
+        await redis_client.delete(f"otp:{body.email}")
+    except Exception:
+        pass
+    _otp_memory_store.pop(body.email, None)
 
     # Generate access token
     token = create_access_token(user.id, user.email)
@@ -126,7 +158,13 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
 
     return TokenResponse(
         access_token=token,
-        user=UserResponse(id=user.id, email=user.email),
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            plan=user.plan,
+            subscription_status=user.subscription_status or "active",
+            monthly_pageview_limit=user.monthly_pageview_limit,
+        ),
     )
 
 
@@ -145,10 +183,17 @@ async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSessi
 
     # Generate new OTP
     otp = f"{random.randint(100000, 999999)}"
-    await redis_client.set(f"otp:{body.email}", otp, ex=300)
+    try:
+        await redis_client.set(f"otp:{body.email}", otp, ex=300)
+    except Exception as e:
+        import logging, time
+        logging.warning(f"Redis unavailable for resend OTP: {e}")
+        _otp_memory_store[body.email] = (otp, time.time() + 300)
+
     send_otp_email(body.email, otp)
 
     return MessageResponse(detail="Verification OTP resent successfully")
+
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -173,7 +218,13 @@ async def login(body: LoginRequest, response: Response, session: SQLSession = De
 
     return TokenResponse(
         access_token=token,
-        user=UserResponse(id=user.id, email=user.email),
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            plan=user.plan,
+            subscription_status=user.subscription_status or "active",
+            monthly_pageview_limit=user.monthly_pageview_limit,
+        ),
     )
 
 
@@ -185,4 +236,10 @@ def logout(response: Response):
 
 @router.get("/me", response_model=UserResponse)
 def me(user: User = Depends(get_current_user)):
-    return UserResponse(id=user.id, email=user.email)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        plan=user.plan,
+        subscription_status=user.subscription_status or "active",
+        monthly_pageview_limit=user.monthly_pageview_limit,
+    )

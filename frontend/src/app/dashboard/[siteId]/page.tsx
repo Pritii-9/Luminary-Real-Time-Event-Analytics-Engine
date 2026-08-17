@@ -11,7 +11,10 @@ import {
   fetchActiveUsers,
   fetchCustomEvents,
   getSite,
+  getMe,
+  logout,
   getToken,
+  createPortalSession,
   SiteData,
 } from "@/lib/api";
 import {
@@ -22,6 +25,9 @@ import {
   Eye, Users, Activity, Globe, FileText, ArrowLeft, Zap,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import UserDropdown from "@/components/UserDropdown";
+import AccountSettingsModal from "@/components/AccountSettingsModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CHIC_COLORS = ["#10b981", "#059669", "#047857", "#065f46", "#64748b", "#475569", "#334155"];
 
@@ -38,6 +44,13 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
   const [activeVisitors, setActiveVisitors] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
+
+  // User details state
+  const [userEmail, setUserEmail] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [limit, setLimit] = useState(10000);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -62,7 +75,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
   async function loadData() {
     setLoading(true);
     try {
-      const [siteData, sumData, tsData, pgData, refData, devData, activeData, customData] =
+      const [siteData, sumData, tsData, pgData, refData, devData, activeData, customData, userData] =
         await Promise.all([
           getSite(siteId),
           fetchSummary(siteId, days),
@@ -72,6 +85,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
           fetchDevices(siteId, days),
           fetchActiveUsers(siteId),
           fetchCustomEvents(siteId, days),
+          getMe().catch(() => null),
         ]);
 
       setSite(siteData);
@@ -81,6 +95,11 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
       if (refData) setReferrers(refData);
       if (devData) setDevices(devData);
       if (customData) setCustomEvents(customData);
+      if (userData) {
+        setUserEmail(userData.email);
+        setPlan(userData.plan);
+        setLimit(userData.monthly_pageview_limit);
+      }
       setActiveVisitors(activeData?.active_visitors || 0);
     } catch (err) {
       console.error("Dashboard load error", err);
@@ -104,7 +123,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
     <div className="min-h-screen p-4 md:p-6 lg:p-8 bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+        <div className="relative z-30 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push("/sites")}
@@ -145,6 +164,22 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
             </div>
 
             <ThemeToggle />
+            <UserDropdown
+              email={userEmail}
+              plan={plan}
+              limit={limit}
+              usage={summary?.pageviews || 0}
+              onManageBilling={async () => {
+                try {
+                  const res = await createPortalSession();
+                  if (res?.portal_url) window.location.href = res.portal_url;
+                } catch (err) {
+                  console.error("Portal error", err);
+                }
+              }}
+              onAccountSettings={() => setShowAccountSettings(true)}
+              onLogout={() => setShowConfirmLogout(true)}
+            />
           </div>
         </div>
 
@@ -300,6 +335,38 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
           </div>
         </div>
       </div>
+
+      {/* Account Settings Modal */}
+      <AccountSettingsModal
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        email={userEmail}
+        plan={plan}
+        limit={limit}
+        onManageBilling={async () => {
+          try {
+            const res = await createPortalSession();
+            if (res?.portal_url) window.location.href = res.portal_url;
+          } catch (err) {
+            console.error("Portal error", err);
+          }
+        }}
+      />
+
+      {/* Confirm Logout Dialog */}
+      <ConfirmDialog
+        isOpen={showConfirmLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out of your Luminary Analytics workspace?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          setShowConfirmLogout(false);
+          await logout();
+          router.push("/login");
+        }}
+        onCancel={() => setShowConfirmLogout(false)}
+      />
     </div>
   );
 }

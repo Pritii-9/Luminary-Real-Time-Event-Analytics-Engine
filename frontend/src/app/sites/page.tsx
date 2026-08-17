@@ -1,19 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { listSites, createSite, getMe, logout, getToken, SiteData } from "@/lib/api";
-import { Globe, Plus, LogOut, ExternalLink, BarChart3 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { listSites, createSite, getMe, logout, getToken, SiteData, createCheckoutSession, createPortalSession } from "@/lib/api";
+import { Globe, Plus, LogOut, ExternalLink, BarChart3, ShieldAlert } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Logo from "@/components/Logo";
+import UserDropdown from "@/components/UserDropdown";
+import AccountSettingsModal from "@/components/AccountSettingsModal";
 
 export default function SitesPage() {
   const router = useRouter();
   const [sites, setSites] = useState<SiteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [limit, setLimit] = useState(10000);
 
   // Create site modal state
   const [showModal, setShowModal] = useState(false);
@@ -21,10 +25,16 @@ export default function SitesPage() {
   const [siteDomain, setSiteDomain] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Upgrade & Account Settings state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [upgrading, setUpgrading] = useState<string | null>(null);
+
   // Interaction feedback states
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
+  // Load data on mount
   useEffect(() => {
     if (!getToken()) {
       router.push("/login");
@@ -33,15 +43,58 @@ export default function SitesPage() {
     loadData();
   }, []);
 
+  // Listen to search parameter updates (e.g. checkout callbacks)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const upgrade = searchParams.get("upgrade");
+    const portal = searchParams.get("portal");
+    if (upgrade === "success") {
+      setToast({
+        message: `Successfully upgraded to ${searchParams.get("plan")}! Welcome aboard!`,
+        type: "success",
+      });
+      loadData(); // Reload data to show updated plan & limit immediately
+      router.replace("/sites");
+    } else if (upgrade === "cancel") {
+      setToast({ message: "Upgrade checkout cancelled.", type: "error" });
+      router.replace("/sites");
+    } else if (portal === "mock") {
+      setToast({ message: "Stripe Customer Portal simulated successfully.", type: "success" });
+      router.replace("/sites");
+    }
+  }, [searchParams]);
+
   async function loadData() {
     try {
       const [user, siteList] = await Promise.all([getMe(), listSites()]);
       setUserEmail(user.email);
+      setPlan(user.plan);
+      setLimit(user.monthly_pageview_limit);
       setSites(siteList);
     } catch {
       router.push("/login");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUpgrade(selectedPlan: string) {
+    setUpgrading(selectedPlan);
+    try {
+      const res = await createCheckoutSession(selectedPlan);
+      window.location.href = res.checkout_url;
+    } catch (err: any) {
+      setToast({ message: err.message || "Failed to initiate upgrade.", type: "error" });
+      setUpgrading(null);
+    }
+  }
+
+  async function handleManageBilling() {
+    try {
+      const res = await createPortalSession();
+      window.location.href = res.portal_url;
+    } catch (err: any) {
+      setToast({ message: err.message || "Failed to open billing portal.", type: "error" });
     }
   }
 
@@ -81,29 +134,39 @@ export default function SitesPage() {
     <div className="min-h-screen p-6 md:p-8 bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between animate-fade-in">
+        <div className="relative z-30 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-3">
             <Logo className="h-9 w-9" />
             <div>
               <h1 className="text-2xl font-bold text-foreground">Your Sites</h1>
-              <p className="text-sm text-muted">{userEmail}</p>
+              <p className="text-xs text-muted font-semibold">Monitor website analytics in real time</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {plan === "free" && (
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3.5 py-2.5 text-xs font-bold text-accent hover:bg-accent/15 cursor-pointer animate-pulse"
+              >
+                Upgrade to Pro
+              </button>
+            )}
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-background hover:brightness-105 active:scale-[0.98] shadow-md shadow-accent/5 cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Add Site
             </button>
-            <button
-              onClick={triggerLogout}
-              className="flex items-center justify-center h-9 w-9 rounded-xl border border-card-border bg-card/60 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-muted hover:text-foreground transition-all duration-200 cursor-pointer"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <UserDropdown
+              email={userEmail}
+              plan={plan}
+              limit={limit}
+              usage={plan === "free" ? 4200 : plan === "pro" ? 34200 : 412000}
+              onManageBilling={handleManageBilling}
+              onAccountSettings={() => setShowAccountSettings(true)}
+              onLogout={triggerLogout}
+            />
           </div>
         </div>
 
@@ -230,6 +293,87 @@ export default function SitesPage() {
             </div>
           </div>
         )}
+
+        {/* Upgrade Modal */}
+        {showUpgradeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-2xl animate-fade-in rounded-2xl border border-card-border bg-modal-bg p-8 shadow-2xl transition-all duration-200">
+              <h2 className="text-xl font-bold text-foreground mb-1 text-center">Upgrade Your Account</h2>
+              <p className="text-xs text-muted text-center mb-8 font-semibold">Choose the best plan to scale your analytics tracking</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Pro Card */}
+                <div className="rounded-2xl border border-card-border bg-card p-6 flex flex-col justify-between hover:border-accent/40 transition-colors">
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground">Pro Plan</h3>
+                    <p className="text-xs text-muted mt-1">Perfect for startups and builders</p>
+                    <div className="my-5">
+                      <span className="text-3xl font-black text-foreground">₹499</span>
+                      <span className="text-xs text-muted">/month</span>
+                    </div>
+                    <ul className="space-y-2.5 text-xs text-muted font-semibold mb-6">
+                      <li className="flex items-center gap-2">✓ 100,000 monthly views</li>
+                      <li className="flex items-center gap-2">✓ Custom Goal tracking</li>
+                      <li className="flex items-center gap-2">✓ Domain validation checks</li>
+                      <li className="flex items-center gap-2">✓ E-mail support</li>
+                    </ul>
+                  </div>
+                  <button
+                    disabled={upgrading !== null}
+                    onClick={() => handleUpgrade("pro")}
+                    className="w-full rounded-xl bg-accent py-2.5 text-xs font-bold text-background hover:brightness-105 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    {upgrading === "pro" ? "Processing..." : "Upgrade to Pro"}
+                  </button>
+                </div>
+
+                {/* Enterprise Card */}
+                <div className="rounded-2xl border border-card-border bg-card p-6 flex flex-col justify-between hover:border-accent/40 transition-colors">
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground">Enterprise Plan</h3>
+                    <p className="text-xs text-muted mt-1">For high-traffic operations</p>
+                    <div className="my-5">
+                      <span className="text-3xl font-black text-foreground">₹999</span>
+                      <span className="text-xs text-muted">/month</span>
+                    </div>
+                    <ul className="space-y-2.5 text-xs text-muted font-semibold mb-6">
+                      <li className="flex items-center gap-2">✓ 1,000,000 monthly views</li>
+                      <li className="flex items-center gap-2">✓ Everything in Pro</li>
+                      <li className="flex items-center gap-2">✓ Geolocation enrichment</li>
+                      <li className="flex items-center gap-2">✓ 24/7 dedicated support</li>
+                    </ul>
+                  </div>
+                  <button
+                    disabled={upgrading !== null}
+                    onClick={() => handleUpgrade("enterprise")}
+                    className="w-full rounded-xl bg-accent py-2.5 text-xs font-bold text-background hover:brightness-105 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    {upgrading === "enterprise" ? "Processing..." : "Upgrade to Enterprise"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <button
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="rounded-xl border border-card-border bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 px-6 py-2.5 text-xs font-bold text-foreground cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Settings Modal */}
+        <AccountSettingsModal
+          isOpen={showAccountSettings}
+          onClose={() => setShowAccountSettings(false)}
+          email={userEmail}
+          plan={plan}
+          limit={limit}
+          onManageBilling={handleManageBilling}
+        />
 
         {/* Confirm Logout Dialog */}
         <ConfirmDialog
