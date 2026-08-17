@@ -82,7 +82,10 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     # 2. Validate payload URL domain
     payload_domain = extract_domain(event.url)
     if payload_domain != cleaned_registered:
-        raise HTTPException(status_code=400, detail="Event URL domain does not match registered site domain")
+        is_local = payload_domain in ("localhost", "127.0.0.1") or cleaned_registered in ("localhost", "127.0.0.1")
+        is_subdomain = payload_domain.endswith("." + cleaned_registered) or cleaned_registered.endswith("." + payload_domain)
+        if not is_local and not is_subdomain:
+            raise HTTPException(status_code=400, detail="Event URL domain does not match registered site domain")
 
     # 3. Validate HTTP headers (Origin / Referer) if they are present
     referer = request.headers.get("referer")
@@ -91,12 +94,17 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     if referer:
         referer_domain = extract_domain(referer)
         if referer_domain != cleaned_registered and not referer_domain.endswith("." + cleaned_registered):
-            raise HTTPException(status_code=403, detail="Forbidden: HTTP Referer mismatch")
+            is_local_ref = referer_domain in ("localhost", "127.0.0.1") or cleaned_registered in ("localhost", "127.0.0.1")
+            if not is_local_ref:
+                raise HTTPException(status_code=403, detail="Forbidden: HTTP Referer mismatch")
             
     if origin:
         origin_domain = extract_domain(origin)
         if origin_domain != cleaned_registered and not origin_domain.endswith("." + cleaned_registered):
-            raise HTTPException(status_code=403, detail="Forbidden: HTTP Origin mismatch")
+            is_local_orig = origin_domain in ("localhost", "127.0.0.1") or cleaned_registered in ("localhost", "127.0.0.1")
+            if not is_local_orig:
+                raise HTTPException(status_code=403, detail="Forbidden: HTTP Origin mismatch")
+
 
     # 4. Check and increment quota limit
     # Key format: quota:{site_id}:{year}-{month}

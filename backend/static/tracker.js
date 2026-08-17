@@ -10,33 +10,35 @@
   var ua = navigator.userAgent || "";
   if (/bot|crawler|spider|scraper|headless|phantom|selenium|puppeteer/i.test(ua)) return;
 
-  // --- Read public_token from the script tag URL ---
+  // --- Read public_token / site_id from the script tag ---
   var scripts = document.getElementsByTagName("script");
   var token = "";
+  var apiBase = "";
+
   for (var i = 0; i < scripts.length; i++) {
-    var src = scripts[i].src || "";
-    if (src.indexOf("tracker.js") !== -1) {
-      var match = src.match(/[?&]site=([^&]+)/);
-      if (match) token = decodeURIComponent(match[1]);
-      break;
+    var s = scripts[i];
+    var src = s.src || "";
+    if (src.indexOf("tracker") !== -1 || src.indexOf("script.js") !== -1) {
+      token = s.getAttribute("data-site-id") || s.getAttribute("data-site") || "";
+      if (!token) {
+        var match = src.match(/[?&](site|site_id|token)=([^&]+)/);
+        if (match) token = decodeURIComponent(match[2]);
+      }
+      try {
+        var url = new URL(src);
+        apiBase = url.origin;
+      } catch (e) {}
+      if (token) break;
     }
   }
+
   if (!token) {
-    console.warn("[Luminary] No site token found in tracker.js URL.");
+    console.warn("[Luminary] No site ID or token found in tracker script tag.");
     return;
   }
 
-  // --- Determine API endpoint (same origin as tracker script) ---
-  var apiBase = "";
-  for (var j = 0; j < scripts.length; j++) {
-    var s = scripts[j].src || "";
-    if (s.indexOf("tracker.js") !== -1) {
-      var url = new URL(s);
-      apiBase = url.origin;
-      break;
-    }
-  }
-  var COLLECT_URL = apiBase + "/api/v1/collect";
+  var COLLECT_URL = (apiBase || window.location.origin) + "/api/v1/collect";
+
 
   // --- Visitor / Session IDs (no cookies) ---
   function uid() {
@@ -77,7 +79,9 @@
     var utm = getUtm();
     var payload = {
       public_token: token,
+      site_id: token,
       event_type: "pageview",
+
       url: window.location.href,
       path: window.location.pathname,
       referrer: document.referrer || "",

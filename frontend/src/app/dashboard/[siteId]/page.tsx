@@ -77,18 +77,18 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
     try {
       const [siteData, sumData, tsData, pgData, refData, devData, activeData, customData, userData] =
         await Promise.all([
-          getSite(siteId),
-          fetchSummary(siteId, days),
-          fetchTimeseries(siteId, days),
-          fetchPages(siteId, days),
-          fetchReferrers(siteId, days),
-          fetchDevices(siteId, days),
-          fetchActiveUsers(siteId),
-          fetchCustomEvents(siteId, days),
+          getSite(siteId).catch(() => null),
+          fetchSummary(siteId, days).catch(() => null),
+          fetchTimeseries(siteId, days).catch(() => []),
+          fetchPages(siteId, days).catch(() => []),
+          fetchReferrers(siteId, days).catch(() => []),
+          fetchDevices(siteId, days).catch(() => []),
+          fetchActiveUsers(siteId).catch(() => null),
+          fetchCustomEvents(siteId, days).catch(() => []),
           getMe().catch(() => null),
         ]);
 
-      setSite(siteData);
+      if (siteData) setSite(siteData);
       if (sumData) setSummary(sumData);
       if (tsData) setTimeseries(tsData);
       if (pgData) setPages(pgData);
@@ -107,6 +107,7 @@ export default function DashboardPage({ params }: { params: Promise<{ siteId: st
       setLoading(false);
     }
   }
+
 
   if (loading) {
     return (

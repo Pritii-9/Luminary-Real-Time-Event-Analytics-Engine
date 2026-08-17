@@ -11,9 +11,12 @@ TRACKER_PATH = Path(__file__).resolve().parent.parent.parent / "static" / "track
 
 
 @router.get("/tracker.js")
+@router.get("/script.js")
+@router.get("/api/v1/tracker/script.js")
 async def serve_tracker():
     return FileResponse(
         TRACKER_PATH,
         media_type="application/javascript",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "no-cache"},
     )
+

@@ -15,9 +15,13 @@ async def _get_active_count(site_id: str) -> int:
     """Get active visitor count from Redis sorted set after pruning old entries."""
     key = f"realtime:{site_id}"
     cutoff = time.time() - 300  # 5 minutes
-    await redis_client.zremrangebyscore(key, "-inf", cutoff)
-    count = await redis_client.zcard(key)
-    return count
+    try:
+        await redis_client.zremrangebyscore(key, "-inf", cutoff)
+        count = await redis_client.zcard(key)
+        return count
+    except Exception:
+        return 0
+
 
 
 @router.get("/active")

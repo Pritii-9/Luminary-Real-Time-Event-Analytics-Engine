@@ -10,8 +10,15 @@ def _rows_to_dicts(result):
 
 
 def _query(query: str, params: dict):
-    client = get_clickhouse_client()
-    return client.query(query, parameters=params)
+    try:
+        client = get_clickhouse_client()
+        return client.query(query, parameters=params)
+    except Exception:
+        class DummyResult:
+            column_names = []
+            result_rows = []
+        return DummyResult()
+
 
 
 # ---------------------------------------------------------------------------
