@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { listSites, createSite, getMe, logout, getToken, SiteData, createCheckoutSession, createPortalSession } from "@/lib/api";
 import { Globe, Plus, LogOut, ExternalLink, BarChart3, ShieldAlert } from "lucide-react";
@@ -12,6 +12,21 @@ import UserDropdown from "@/components/UserDropdown";
 import AccountSettingsModal from "@/components/AccountSettingsModal";
 
 export default function SitesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background text-muted">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-6 w-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <span className="text-xs">Loading workspace...</span>
+        </div>
+      </div>
+    }>
+      <SitesPageContent />
+    </Suspense>
+  );
+}
+
+function SitesPageContent() {
   const router = useRouter();
   const [sites, setSites] = useState<SiteData[]>([]);
   const [loading, setLoading] = useState(true);
