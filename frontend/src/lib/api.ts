@@ -158,7 +158,7 @@ export async function getSnippet(siteId: string) {
 }
 
 export async function deleteSite(siteId: string) {
-  return apiFetch<null>(`/api/v1/sites/${siteId}`, {
+  return apiFetch<null>(`/api/v1/sites/${encodeURIComponent(siteId)}`, {
     method: "DELETE",
   });
 }
