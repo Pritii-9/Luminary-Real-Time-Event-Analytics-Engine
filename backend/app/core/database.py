@@ -89,9 +89,13 @@ if _db_dir:
 
 if settings.database_url:
     # SQLModel works out of the box with PostgreSQL
-    engine = create_engine(settings.database_url, echo=False)
+    db_url = settings.database_url
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(db_url, echo=False)
 else:
     engine = create_engine(f"sqlite:///{settings.sqlite_path}", echo=False)
+
 
 
 def create_tables():

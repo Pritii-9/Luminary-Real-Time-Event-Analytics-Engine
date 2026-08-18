@@ -22,22 +22,22 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-card-border bg-modal-bg p-6 shadow-2xl transition-all duration-200">
-        <h3 className="text-base font-bold text-foreground mb-2">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in p-4">
+      <div className="w-full max-w-sm rounded-lg border border-card-border bg-card p-6">
+        <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
         <p className="text-xs text-muted mb-6 leading-relaxed">{message}</p>
         <div className="flex gap-3 justify-end">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-card-border bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 px-4 py-2.5 text-xs font-bold text-foreground cursor-pointer transition-all"
+            className="rounded-md border border-card-border bg-transparent px-4 py-2 text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-4 py-2.5 text-xs font-bold text-red-500 dark:text-red-400 cursor-pointer transition-all"
+            className="rounded-md bg-danger/10 border border-danger/20 px-4 py-2 text-xs font-medium text-danger hover:bg-danger/15 cursor-pointer transition-colors"
           >
             {confirmLabel}
           </button>

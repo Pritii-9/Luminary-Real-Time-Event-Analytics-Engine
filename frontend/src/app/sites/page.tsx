@@ -1,9 +1,29 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { listSites, createSite, getMe, logout, getToken, SiteData, createCheckoutSession, createPortalSession } from "@/lib/api";
-import { Globe, Plus, LogOut, ExternalLink, BarChart3, ShieldAlert } from "lucide-react";
+import {
+  listSites,
+  createSite,
+  getMe,
+  logout,
+  getToken,
+  SiteData,
+  createCheckoutSession,
+  createPortalSession,
+} from "@/lib/api";
+import CustomSelect from "@/components/CustomSelect";
+import {
+  Globe,
+  Plus,
+  ExternalLink,
+  BarChart3,
+  Code,
+  Search,
+  MoreVertical,
+  Copy,
+  Check,
+} from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -13,14 +33,13 @@ import AccountSettingsModal from "@/components/AccountSettingsModal";
 
 export default function SitesPage() {
   return (
-    <Suspense fallback={
-      <div className="flex h-screen items-center justify-center bg-background text-muted">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-6 w-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-          <span className="text-xs">Loading workspace...</span>
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-background text-muted">
+          <div className="h-5 w-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         </div>
-      </div>
-    }>
+      }
+    >
       <SitesPageContent />
     </Suspense>
   );
@@ -34,22 +53,28 @@ function SitesPageContent() {
   const [plan, setPlan] = useState("free");
   const [limit, setLimit] = useState(10000);
 
-  // Create site modal state
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "date">("date");
+
+  // Site Creation Modal
   const [showModal, setShowModal] = useState(false);
   const [siteName, setSiteName] = useState("");
   const [siteDomain, setSiteDomain] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Upgrade & Account Settings state
+  // Modals & Options
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [activeMenuSiteId, setActiveMenuSiteId] = useState<string | null>(null);
+  const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
 
-  // Interaction feedback states
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
-  // Load data on mount
+  const searchParams = useSearchParams();
+
   useEffect(() => {
     if (!getToken()) {
       router.push("/login");
@@ -58,23 +83,18 @@ function SitesPageContent() {
     loadData();
   }, []);
 
-  // Listen to search parameter updates (e.g. checkout callbacks)
-  const searchParams = useSearchParams();
   useEffect(() => {
     const upgrade = searchParams.get("upgrade");
     const portal = searchParams.get("portal");
     if (upgrade === "success") {
-      setToast({
-        message: `Successfully upgraded to ${searchParams.get("plan")}! Welcome aboard!`,
-        type: "success",
-      });
-      loadData(); // Reload data to show updated plan & limit immediately
+      setToast({ message: `Upgraded to ${searchParams.get("plan")}. Welcome aboard.`, type: "success" });
+      loadData();
       router.replace("/sites");
     } else if (upgrade === "cancel") {
-      setToast({ message: "Upgrade checkout cancelled.", type: "error" });
+      setToast({ message: "Upgrade cancelled.", type: "error" });
       router.replace("/sites");
     } else if (portal === "mock") {
-      setToast({ message: "Stripe Customer Portal simulated successfully.", type: "success" });
+      setToast({ message: "Billing portal simulated.", type: "success" });
       router.replace("/sites");
     }
   }, [searchParams]);
@@ -122,7 +142,7 @@ function SitesPageContent() {
       setShowModal(false);
       setSiteName("");
       setSiteDomain("");
-      setToast({ message: "Site added successfully!", type: "success" });
+      setToast({ message: "Site created successfully.", type: "success" });
     } catch (err: any) {
       setToast({ message: err.message || "Failed to create site.", type: "error" });
     } finally {
@@ -130,15 +150,40 @@ function SitesPageContent() {
     }
   }
 
-  async function triggerLogout() {
-    setShowConfirmLogout(true);
-  }
+  const handleCopySiteId = (e: React.MouseEvent, siteIdStr: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(siteIdStr);
+    setCopiedSiteId(siteIdStr);
+    setToast({ message: "Site ID copied to clipboard", type: "success" });
+    setTimeout(() => setCopiedSiteId(null), 2000);
+    setActiveMenuSiteId(null);
+  };
+
+  // Filter & Sort sites
+  const filteredSites = useMemo(() => {
+    return sites
+      .filter((s) => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+        return (
+          s.name.toLowerCase().includes(query) ||
+          s.domain.toLowerCase().includes(query) ||
+          s.site_id.toLowerCase().includes(query)
+        );
+      })
+      .sort((a, b) => {
+        if (sortBy === "name") {
+          return a.name.localeCompare(b.name);
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+  }, [sites, searchQuery, sortBy]);
 
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-muted">
         <div className="flex flex-col items-center gap-2">
-          <div className="h-6 w-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <div className="h-5 w-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
           <span className="text-xs">Loading sites...</span>
         </div>
       </div>
@@ -146,124 +191,313 @@ function SitesPageContent() {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-8 bg-background text-foreground transition-colors duration-200">
-      <div className="mx-auto max-w-5xl">
-        {/* Header */}
-        <div className="relative z-30 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <Logo className="h-9 w-9" />
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Your Sites</h1>
-              <p className="text-xs text-muted font-semibold">Monitor website analytics in real time</p>
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
+      {/* 1. TOP NAVIGATION / HEADER (Sticky, Glassmorphic, Theme-Aware) */}
+      <header className="sticky top-0 z-40 h-14 w-full border-b border-card-border bg-background/80 backdrop-blur-md px-4 md:px-8 flex items-center justify-between">
+        {/* Left: Logo & Workspace Title Switcher */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/sites")}
+            className="flex items-center gap-2.5 group text-left cursor-pointer"
+          >
+            <div className="h-7 w-7 rounded-lg bg-card border border-card-border flex items-center justify-center group-hover:border-accent/40 transition-colors">
+              <Logo className="h-4 w-4" />
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            {plan === "free" && (
-              <button
-                onClick={() => setShowUpgradeModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3.5 py-2.5 text-xs font-bold text-accent hover:bg-accent/15 cursor-pointer animate-pulse"
-              >
-                Upgrade to Pro
-              </button>
-            )}
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
+              <span className="text-foreground font-semibold text-sm">Luminary</span>
+              <span>/</span>
+              <span className="text-foreground/80">Overview</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Right: Actions Group */}
+        <div className="flex items-center gap-2.5">
+          {plan === "free" && (
             <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-background hover:brightness-105 active:scale-[0.98] shadow-md shadow-accent/5 cursor-pointer"
+              type="button"
+              onClick={() => setShowUpgradeModal(true)}
+              className="flex items-center h-8 rounded-md border border-card-border bg-card px-3 text-xs font-medium text-muted hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
             >
-              <Plus className="h-4 w-4" /> Add Site
+              Upgrade
             </button>
-            <UserDropdown
-              email={userEmail}
-              plan={plan}
-              limit={limit}
-              usage={plan === "free" ? 4200 : plan === "pro" ? 34200 : 412000}
-              onManageBilling={handleManageBilling}
-              onAccountSettings={() => setShowAccountSettings(true)}
-              onLogout={triggerLogout}
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 h-8 rounded-md bg-foreground px-3 text-xs font-semibold text-background hover:opacity-90 active:scale-[0.98] cursor-pointer transition-all shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Site</span>
+          </button>
+
+          <div className="h-4 w-[1px] bg-card-border mx-0.5" />
+
+          <ThemeToggle />
+
+          <UserDropdown
+            email={userEmail}
+            plan={plan}
+            limit={limit}
+            usage={plan === "free" ? 4200 : plan === "pro" ? 34200 : 412000}
+            onManageBilling={handleManageBilling}
+            onAccountSettings={() => setShowAccountSettings(true)}
+            onLogout={() => setShowConfirmLogout(true)}
+          />
+        </div>
+      </header>
+
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 py-8">
+        {/* 2. PAGE HEADER & TOOLBAR */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Your Sites</h1>
+            <p className="text-xs text-muted mt-1">
+              Monitor website performance, pageviews, and real-time user sessions.
+            </p>
+          </div>
+
+          {/* Search & Sorting Bar */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Filter sites..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-9 rounded-md border border-card-border bg-card px-3 pl-9 text-xs text-foreground placeholder:text-muted focus:border-accent focus:outline-none transition-colors"
+              />
+            </div>
+
+            {/* Sort Menu */}
+            <CustomSelect
+              value={sortBy}
+              onChange={(val) => setSortBy(val as "name" | "date")}
+              options={[
+                { label: "Sort by Date", value: "date" },
+                { label: "Sort by Name", value: "value" },
+              ]}
             />
           </div>
         </div>
 
-        {/* Sites Grid */}
-        {sites.length === 0 ? (
-          <div className="animate-fade-in rounded-2xl border border-dashed border-card-border bg-card/20 p-16 text-center">
-            <Globe className="mx-auto h-12 w-12 text-muted mb-4" />
-            <h2 className="text-lg font-bold text-foreground mb-2">No sites yet</h2>
-            <p className="text-sm text-muted mb-6">Add your first website to start tracking analytics.</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-background hover:brightness-105 active:scale-[0.98] cursor-pointer"
-            >
-              <Plus className="h-4 w-4" /> Add Your First Site
-            </button>
+        {/* 3. SITE CARDS GRID & ALIGNMENT */}
+        {filteredSites.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-card-border bg-card/30 p-12 text-center my-8">
+            <Globe className="mx-auto h-10 w-10 text-muted mb-3" />
+            <h3 className="text-sm font-semibold text-foreground mb-1">
+              {searchQuery ? "No sites match your filter" : "No sites added yet"}
+            </h3>
+            <p className="text-xs text-muted mb-5 max-w-sm mx-auto">
+              {searchQuery
+                ? `No properties found matching "${searchQuery}". Try clearing your search.`
+                : "Create your first site tracking property to generate tracking code and view analytics."}
+            </p>
+            {searchQuery ? (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="inline-flex items-center h-8 rounded-md border border-card-border bg-card px-3 text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              >
+                Clear Filter
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowModal(true)}
+                className="inline-flex items-center gap-1.5 h-8 rounded-md bg-foreground px-3.5 text-xs font-semibold text-background hover:opacity-90 cursor-pointer transition-all shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Your First Site
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {sites.map((site, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredSites.map((site) => (
               <div
                 key={site.id}
-                className="group animate-fade-in rounded-2xl border border-card-border bg-card p-6 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/2 transition-all duration-200 cursor-pointer"
-                style={{ animationDelay: `${i * 60}ms` }}
                 onClick={() => router.push(`/dashboard/${site.site_id}`)}
+                className="group relative rounded-xl border border-card-border bg-card p-5 hover:border-accent/40 hover:bg-white/[0.02] transition-all cursor-pointer flex flex-col justify-between"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                      <Globe className="h-5 w-5 text-accent" />
+                {/* CARD TOP SECTION */}
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Icon */}
+                      <div className="h-9 w-9 rounded-lg bg-background border border-card-border flex items-center justify-center shrink-0 group-hover:border-accent/40 transition-colors">
+                        <Globe className="h-4.5 w-4.5 text-muted group-hover:text-foreground transition-colors" />
+                      </div>
+
+                      {/* Title & External Link */}
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-accent transition-colors">
+                          {site.name}
+                        </h3>
+                        <a
+                          href={`https://${site.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors truncate mt-0.5"
+                        >
+                          <span className="truncate">{site.domain}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0 text-muted" />
+                        </a>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-foreground group-hover:text-accent transition-colors">{site.name}</h3>
-                      <p className="text-xs text-muted">{site.domain}</p>
+
+                    {/* Context Action Menu */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuSiteId(activeMenuSiteId === site.site_id ? null : site.site_id);
+                        }}
+                        className="h-7 w-7 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+
+                      {activeMenuSiteId === site.site_id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 mt-1 w-44 rounded-lg border border-card-border bg-card p-1 shadow-xl z-30 animate-fade-in text-xs"
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopySiteId(e, site.site_id)}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
+                          >
+                            {copiedSiteId === site.site_id ? (
+                              <Check className="h-3.5 w-3.5 text-success" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5 text-muted" />
+                            )}
+                            <span>Copy Site ID</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              router.push(`/dashboard/${site.site_id}/snippet`);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
+                          >
+                            <Code className="h-3.5 w-3.5 text-muted" />
+                            <span>View Snippet</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              router.push(`/dashboard/${site.site_id}`);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
+                          >
+                            <BarChart3 className="h-3.5 w-3.5 text-muted" />
+                            <span>Open Dashboard</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <BarChart3 className="h-4 w-4 text-muted group-hover:text-accent transition-colors" />
+
+                  {/* CARD MIDDLE SECTION: MINI METRICS BAR */}
+                  <div className="my-4 rounded-lg border border-border-subtle bg-background/50 p-3 grid grid-cols-3 gap-2 text-center">
+                    {/* Live indicator */}
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                        </span>
+                        <span className="text-xs font-bold text-foreground">Active</span>
+                      </div>
+                      <span className="text-[10px] text-muted mt-0.5">Real-time</span>
+                    </div>
+
+                    {/* Views */}
+                    <div className="flex flex-col items-center justify-center border-x border-border-subtle">
+                      <span className="text-xs font-semibold text-foreground">
+                        {plan === "free" ? "4.2k" : "34.2k"}
+                      </span>
+                      <span className="text-[10px] text-muted mt-0.5">Pageviews</span>
+                    </div>
+
+                    {/* Created Date */}
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-xs font-medium text-foreground">
+                        {new Date(site.created_at).toLocaleDateString("en-US", {
+                          month: "numeric",
+                          day: "numeric",
+                          year: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-[10px] text-muted mt-0.5">Created</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2 border-t border-border-subtle pt-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted">Site ID</span>
-                    <span className="font-mono font-semibold text-foreground/80">{site.site_id}</span>
+                {/* CARD BOTTOM SECTION: SITE ID + ACTIONS */}
+                <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-2 mt-1">
+                  {/* Site ID */}
+                  <div
+                    onClick={(e) => handleCopySiteId(e, site.site_id)}
+                    className="font-mono text-[11px] text-muted hover:text-foreground transition-colors truncate max-w-[110px]"
+                    title="Click to copy Site ID"
+                  >
+                    {site.site_id}
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted">Created</span>
-                    <span className="font-semibold text-foreground/80">{new Date(site.created_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
 
-                <div className="mt-5 flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/dashboard/${site.site_id}`);
-                    }}
-                    className="flex-1 rounded-xl bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 border border-card-border px-3 py-2 text-xs font-bold text-foreground flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <BarChart3 className="h-3.5 w-3.5" /> Dashboard
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/dashboard/${site.site_id}/snippet`);
-                    }}
-                    className="flex-1 rounded-xl bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 border border-card-border px-3 py-2 text-xs font-bold text-foreground flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" /> Snippet
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/${site.site_id}/snippet`);
+                      }}
+                      className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-card px-2.5 text-xs font-medium text-muted hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <Code className="h-3 w-3" />
+                      <span>Snippet</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/${site.site_id}`);
+                      }}
+                      className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-card px-2.5 text-xs font-medium text-foreground hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <BarChart3 className="h-3 w-3 text-muted" />
+                      <span>Dashboard</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Create Site Modal */}
+        {/* MODAL: ADD NEW SITE */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="w-full max-w-md animate-fade-in rounded-2xl border border-card-border bg-modal-bg p-8 shadow-2xl transition-all duration-200">
-              <h2 className="text-lg font-bold text-foreground mb-6">Add New Site</h2>
-              <form onSubmit={handleCreate} className="space-y-5">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+            <div className="w-full max-w-md rounded-xl border border-card-border bg-card p-6 shadow-2xl">
+              <h2 className="text-base font-semibold text-foreground mb-1">Add New Site Property</h2>
+              <p className="text-xs text-muted mb-5">
+                Enter your website details to generate a dedicated tracking ID.
+              </p>
+
+              <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label htmlFor="modal-name" className="block text-xs font-bold text-muted mb-1.5 uppercase tracking-wider">
+                  <label htmlFor="modal-name" className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">
                     Site Name
                   </label>
                   <input
@@ -271,35 +505,37 @@ function SitesPageContent() {
                     required
                     value={siteName}
                     onChange={(e) => setSiteName(e.target.value)}
-                    className="w-full rounded-xl border border-card-border bg-background/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted/40 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/10"
-                    placeholder="My Blog"
+                    className="w-full h-9 rounded-md border border-card-border bg-background px-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                    placeholder="e.g. Acme SaaS Application"
                   />
                 </div>
+
                 <div>
-                  <label htmlFor="modal-domain" className="block text-xs font-bold text-muted mb-1.5 uppercase tracking-wider">
-                    Domain
+                  <label htmlFor="modal-domain" className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">
+                    Domain Name
                   </label>
                   <input
                     id="modal-domain"
                     required
                     value={siteDomain}
                     onChange={(e) => setSiteDomain(e.target.value)}
-                    className="w-full rounded-xl border border-card-border bg-background/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted/40 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/10"
-                    placeholder="myblog.com"
+                    className="w-full h-9 rounded-md border border-card-border bg-background px-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                    placeholder="e.g. acme.com"
                   />
                 </div>
+
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 rounded-xl border border-card-border bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 px-4 py-2.5 text-sm font-bold text-foreground cursor-pointer"
+                    className="flex-1 h-9 rounded-md border border-card-border bg-transparent text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={creating}
-                    className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-background hover:brightness-105 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="flex-1 h-9 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 disabled:opacity-40 cursor-pointer transition-opacity"
                   >
                     {creating ? "Creating..." : "Create Site"}
                   </button>
@@ -309,59 +545,86 @@ function SitesPageContent() {
           </div>
         )}
 
-        {/* Upgrade Modal */}
+        {/* MODAL: UPGRADE PLAN */}
         {showUpgradeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="w-full max-w-2xl animate-fade-in rounded-2xl border border-card-border bg-modal-bg p-8 shadow-2xl transition-all duration-200">
-              <h2 className="text-xl font-bold text-foreground mb-1 text-center">Upgrade Your Account</h2>
-              <p className="text-xs text-muted text-center mb-8 font-semibold">Choose the best plan to scale your analytics tracking</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Pro Card */}
-                <div className="rounded-2xl border border-card-border bg-card p-6 flex flex-col justify-between hover:border-accent/40 transition-colors">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+            <div className="w-full max-w-2xl rounded-xl border border-card-border bg-card p-6 shadow-2xl">
+              <h2 className="text-lg font-semibold text-foreground text-center mb-1">Upgrade Luminary Tier</h2>
+              <p className="text-xs text-muted text-center mb-6">Choose a plan that fits your application traffic.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Pro Tier */}
+                <div className="rounded-xl border border-card-border bg-background p-5 flex flex-col justify-between hover:border-accent/40 transition-colors">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Pro Plan</h3>
-                    <p className="text-xs text-muted mt-1">Perfect for startups and builders</p>
-                    <div className="my-5">
-                      <span className="text-3xl font-black text-foreground">₹499</span>
-                      <span className="text-xs text-muted">/month</span>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-foreground">Pro</h3>
+                      <span className="text-[10px] font-medium text-success border border-success/20 bg-success/10 px-2 py-0.5 rounded-full">
+                        Popular
+                      </span>
                     </div>
-                    <ul className="space-y-2.5 text-xs text-muted font-semibold mb-6">
-                      <li className="flex items-center gap-2">✓ 100,000 monthly views</li>
-                      <li className="flex items-center gap-2">✓ Custom Goal tracking</li>
-                      <li className="flex items-center gap-2">✓ Domain validation checks</li>
-                      <li className="flex items-center gap-2">✓ E-mail support</li>
+                    <p className="text-xs text-muted mt-1">For growing web applications</p>
+
+                    <div className="my-4">
+                      <span className="text-2xl font-bold text-foreground">₹499</span>
+                      <span className="text-xs text-muted"> / month</span>
+                    </div>
+
+                    <ul className="space-y-2 text-xs text-muted mb-6">
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>100,000 monthly pageviews</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Custom event & goal tracking</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Real-time session telemetry</span>
+                      </li>
                     </ul>
                   </div>
+
                   <button
                     disabled={upgrading !== null}
                     onClick={() => handleUpgrade("pro")}
-                    className="w-full rounded-xl bg-accent py-2.5 text-xs font-bold text-background hover:brightness-105 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full h-9 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 disabled:opacity-40 cursor-pointer transition-opacity"
                   >
                     {upgrading === "pro" ? "Processing..." : "Upgrade to Pro"}
                   </button>
                 </div>
 
-                {/* Enterprise Card */}
-                <div className="rounded-2xl border border-card-border bg-card p-6 flex flex-col justify-between hover:border-accent/40 transition-colors">
+                {/* Enterprise Tier */}
+                <div className="rounded-xl border border-card-border bg-background p-5 flex flex-col justify-between hover:border-accent/40 transition-colors">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Enterprise Plan</h3>
-                    <p className="text-xs text-muted mt-1">For high-traffic operations</p>
-                    <div className="my-5">
-                      <span className="text-3xl font-black text-foreground">₹999</span>
-                      <span className="text-xs text-muted">/month</span>
+                    <h3 className="text-sm font-semibold text-foreground">Enterprise</h3>
+                    <p className="text-xs text-muted mt-1">For high volume & critical SLA</p>
+
+                    <div className="my-4">
+                      <span className="text-2xl font-bold text-foreground">₹999</span>
+                      <span className="text-xs text-muted"> / month</span>
                     </div>
-                    <ul className="space-y-2.5 text-xs text-muted font-semibold mb-6">
-                      <li className="flex items-center gap-2">✓ 1,000,000 monthly views</li>
-                      <li className="flex items-center gap-2">✓ Everything in Pro</li>
-                      <li className="flex items-center gap-2">✓ Geolocation enrichment</li>
-                      <li className="flex items-center gap-2">✓ 24/7 dedicated support</li>
+
+                    <ul className="space-y-2 text-xs text-muted mb-6">
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>1,000,000 monthly pageviews</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Priority ClickHouse aggregation</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Unlimited team members</span>
+                      </li>
                     </ul>
                   </div>
+
                   <button
                     disabled={upgrading !== null}
                     onClick={() => handleUpgrade("enterprise")}
-                    className="w-full rounded-xl bg-accent py-2.5 text-xs font-bold text-background hover:brightness-105 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full h-9 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 disabled:opacity-40 cursor-pointer transition-opacity"
                   >
                     {upgrading === "enterprise" ? "Processing..." : "Upgrade to Enterprise"}
                   </button>
@@ -371,7 +634,7 @@ function SitesPageContent() {
               <div className="text-center">
                 <button
                   onClick={() => setShowUpgradeModal(false)}
-                  className="rounded-xl border border-card-border bg-background/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 px-6 py-2.5 text-xs font-bold text-foreground cursor-pointer"
+                  className="h-8 rounded-md border border-card-border bg-transparent px-4 text-xs font-medium text-muted hover:text-foreground cursor-pointer transition-colors"
                 >
                   Close
                 </button>
@@ -380,7 +643,6 @@ function SitesPageContent() {
           </div>
         )}
 
-        {/* Account Settings Modal */}
         <AccountSettingsModal
           isOpen={showAccountSettings}
           onClose={() => setShowAccountSettings(false)}
@@ -390,7 +652,6 @@ function SitesPageContent() {
           onManageBilling={handleManageBilling}
         />
 
-        {/* Confirm Logout Dialog */}
         <ConfirmDialog
           isOpen={showConfirmLogout}
           title="Sign Out"
@@ -405,7 +666,6 @@ function SitesPageContent() {
           onCancel={() => setShowConfirmLogout(false)}
         />
 
-        {/* Dynamic Toast Notifications */}
         {toast && (
           <Toast
             message={toast.message}
@@ -413,7 +673,7 @@ function SitesPageContent() {
             onClose={() => setToast(null)}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 }
