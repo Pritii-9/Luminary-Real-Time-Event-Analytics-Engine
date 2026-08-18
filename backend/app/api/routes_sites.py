@@ -2,11 +2,12 @@
 
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlmodel import Session as SQLSession, select
 
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.core.database import Site, User, get_session
 
 
@@ -96,6 +97,7 @@ def get_site(
 @router.get("/{site_id}/snippet", response_model=SnippetResponse)
 def get_snippet(
     site_id: str,
+    request: Request,
     user: User = Depends(get_current_user),
     session: SQLSession = Depends(get_session),
 ):
@@ -105,7 +107,8 @@ def get_snippet(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
+    base_url = settings.app_url.rstrip("/") if settings.app_url else str(request.base_url).rstrip("/")
     snippet = (
-        f'<script src="http://localhost:8000/tracker.js?site={site.public_token}" defer></script>'
+        f'<script src="{base_url}/tracker.js?site={site.public_token}" defer></script>'
     )
     return SnippetResponse(snippet=snippet, public_token=site.public_token)

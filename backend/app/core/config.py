@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     stripe_pro_price_id: str = "price_mock_pro"
     stripe_enterprise_price_id: str = "price_mock_enterprise"
     frontend_url: str = "http://localhost:3001"
+    app_url: str = ""
 
     class Config:
         env_file = (os.path.join(BASE_DIR, ".env"), ".env")
