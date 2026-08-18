@@ -107,7 +107,8 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
 
 
     # 2. Validate payload URL domain
-    payload_domain = extract_domain(event.url)
+    event_url = event.url or ""
+    payload_domain = extract_domain(event_url) if event_url else cleaned_registered
     if payload_domain != cleaned_registered:
         is_local = payload_domain in ("localhost", "127.0.0.1") or cleaned_registered in ("localhost", "127.0.0.1")
         is_subdomain = payload_domain.endswith("." + cleaned_registered) or cleaned_registered.endswith("." + payload_domain)

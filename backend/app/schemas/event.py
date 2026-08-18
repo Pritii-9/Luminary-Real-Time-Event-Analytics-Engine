@@ -4,19 +4,19 @@ from pydantic import BaseModel, Field
 
 class EventIn(BaseModel):
     # site_id OR public_token — at least one must be provided
-    site_id: Optional[str] = Field(default=None, max_length=64)
-    public_token: Optional[str] = Field(default=None, max_length=64)
+    site_id: Optional[str] = Field(default=None, max_length=256)
+    public_token: Optional[str] = Field(default=None, max_length=256)
 
-    event_type: Literal["pageview", "custom"] = "pageview"
-    url: str
-    path: str
-    referrer: Optional[str] = None
-    session_id: Optional[str] = Field(default=None, max_length=128)
-    visitor_id: Optional[str] = Field(default=None, max_length=128)
-    screen: Optional[str] = None
+    event_type: str = "pageview"
+    url: Optional[str] = ""
+    path: Optional[str] = "/"
+    referrer: Optional[str] = ""
+    session_id: Optional[str] = Field(default=None, max_length=256)
+    visitor_id: Optional[str] = Field(default=None, max_length=256)
+    screen: Optional[str] = ""
     timestamp: Optional[int] = None
 
-    # New fields from JS SDK
+    # Optional metadata & UTMs
     language: Optional[str] = None
     timezone: Optional[str] = None
     utm_source: Optional[str] = None
