@@ -41,7 +41,14 @@ export default function SnippetPage({ params }: { params: Promise<{ siteId: stri
         getMe().catch(() => null),
       ]);
       setSite(siteData);
-      setSnippet(snippetData.snippet);
+      const activeBackendUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+          ? "https://luminary-scalable-web-event-engine.onrender.com"
+          : "http://localhost:8000");
+
+      const cleanSnippet = snippetData.snippet.replace("http://localhost:8000", activeBackendUrl);
+      setSnippet(cleanSnippet);
       if (userData) {
         setUserEmail(userData.email);
         setPlan(userData.plan);
