@@ -11,8 +11,8 @@ class EventIn(BaseModel):
     url: str
     path: str
     referrer: Optional[str] = None
-    session_id: str = Field(min_length=1, max_length=128)
-    visitor_id: str = Field(min_length=1, max_length=128)
+    session_id: Optional[str] = Field(default=None, max_length=128)
+    visitor_id: Optional[str] = Field(default=None, max_length=128)
     screen: Optional[str] = None
     timestamp: Optional[int] = None
 

@@ -112,3 +112,20 @@ def get_snippet(
         f'<script src="{base_url}/tracker.js?site={site.public_token}" defer></script>'
     )
     return SnippetResponse(snippet=snippet, public_token=site.public_token)
+
+
+@router.delete("/{site_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_site(
+    site_id: str,
+    user: User = Depends(get_current_user),
+    session: SQLSession = Depends(get_session),
+):
+    site = session.exec(
+        select(Site).where(Site.site_id == site_id, Site.user_id == user.id)
+    ).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    session.delete(site)
+    session.commit()
+    return None

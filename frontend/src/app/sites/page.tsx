@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   listSites,
   createSite,
+  deleteSite,
   getMe,
   logout,
   getToken,
@@ -23,6 +24,7 @@ import {
   MoreVertical,
   Copy,
   Check,
+  Trash2,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
@@ -70,8 +72,27 @@ function SitesPageContent() {
   const [activeMenuSiteId, setActiveMenuSiteId] = useState<string | null>(null);
   const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
 
+  // Delete site state
+  const [siteToDelete, setSiteToDelete] = useState<SiteData | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+
+  async function handleDeleteSite() {
+    if (!siteToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteSite(siteToDelete.site_id);
+      setSites((prev) => prev.filter((s) => s.site_id !== siteToDelete.site_id));
+      setToast({ message: `Site "${siteToDelete.name}" deleted.`, type: "success" });
+      setSiteToDelete(null);
+    } catch (err: any) {
+      setToast({ message: err.message || "Failed to delete site.", type: "error" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const searchParams = useSearchParams();
 
@@ -402,6 +423,20 @@ function SitesPageContent() {
                             <BarChart3 className="h-3.5 w-3.5 text-muted" />
                             <span>Open Dashboard</span>
                           </button>
+
+                          <div className="my-1 border-t border-border-subtle" />
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              setSiteToDelete(site);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-danger hover:bg-danger/10 text-left transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-danger" />
+                            <span>Delete Site</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -664,6 +699,16 @@ function SitesPageContent() {
             router.push("/login");
           }}
           onCancel={() => setShowConfirmLogout(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={siteToDelete !== null}
+          title="Delete Site Property"
+          message={`Are you sure you want to delete "${siteToDelete?.name}" (${siteToDelete?.domain})? All tracking telemetry and configuration for this site will be permanently removed.`}
+          confirmLabel={deleting ? "Deleting..." : "Delete Site"}
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteSite}
+          onCancel={() => setSiteToDelete(null)}
         />
 
         {toast && (

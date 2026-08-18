@@ -55,6 +55,32 @@
     return params;
   }
 
+  function getVisitorId() {
+    try {
+      var vid = localStorage.getItem("_lum_vid");
+      if (!vid) {
+        vid = "vis_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+        localStorage.setItem("_lum_vid", vid);
+      }
+      return vid;
+    } catch (e) {
+      return "vis_" + Math.random().toString(36).substring(2, 11);
+    }
+  }
+
+  function getSessionId() {
+    try {
+      var sid = sessionStorage.getItem("_lum_sid");
+      if (!sid) {
+        sid = "ses_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+        sessionStorage.setItem("_lum_sid", sid);
+      }
+      return sid;
+    } catch (e) {
+      return "ses_" + Math.random().toString(36).substring(2, 11);
+    }
+  }
+
   // --- Send event ---
   function send(overrides) {
     var utm = getUtm();
@@ -62,13 +88,11 @@
       public_token: token,
       site_id: token.startsWith("site_") ? token : undefined,
       event_type: "pageview",
-
-
       url: window.location.href,
       path: window.location.pathname,
       referrer: document.referrer || "",
-      session_id: "",
-      visitor_id: "",
+      session_id: getSessionId(),
+      visitor_id: getVisitorId(),
       screen: screen.width + "x" + screen.height,
       language: navigator.language || "",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
