@@ -52,17 +52,47 @@ def get_cached(site_id: str, endpoint: str, days: int):
 
 def set_cached(site_id: str, endpoint: str, days: int, data, ttl: int = DEFAULT_TTL):
     """Store data in cache with TTL."""
+    is_empty = False
+    if isinstance(data, dict) and not data.get("pageviews"):
+        is_empty = True
+    elif isinstance(data, list) and len(data) == 0:
+        is_empty = True
+
+    effective_ttl = 2 if is_empty else ttl
     key = cache_key(site_id, endpoint, days)
-    _memory_cache[key] = (data, time.time() + 15)
+    _memory_cache[key] = (data, time.time() + (2 if is_empty else 15))
 
     global _redis_disabled_until
     if time.time() < _redis_disabled_until:
         return
 
     try:
-        _sync_redis.setex(key, ttl, json.dumps(data, default=str))
+        _sync_redis.setex(key, effective_ttl, json.dumps(data, default=str))
     except Exception as e:
         _redis_disabled_until = time.time() + 30
         logging.debug(f"Cache write failed, disabling for 30s: {e}")
+
+
+def invalidate_site_cache(site_id: str):
+    """Clear memory and Redis cache for a site when new events arrive."""
+    if not site_id:
+        return
+
+    # Clear memory cache entries for site
+    keys_to_del = [k for k in list(_memory_cache.keys()) if f":{site_id}:" in k]
+    for k in keys_to_del:
+        _memory_cache.pop(k, None)
+
+    global _redis_disabled_until
+    if time.time() < _redis_disabled_until:
+        return
+
+    try:
+        keys = _sync_redis.keys(f"cache:{site_id}:*")
+        if keys:
+            _sync_redis.delete(*keys)
+    except Exception as e:
+        _redis_disabled_until = time.time() + 30
+        logging.debug(f"Cache invalidate failed: {e}")
 
 
