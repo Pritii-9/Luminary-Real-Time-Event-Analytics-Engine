@@ -152,7 +152,8 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
         key="luminary_token",
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite="none",
+        secure=True,
         max_age=86400,
     )
 
@@ -212,7 +213,8 @@ async def login(body: LoginRequest, response: Response, session: SQLSession = De
         key="luminary_token",
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite="none",
+        secure=True,
         max_age=86400,
     )
 
