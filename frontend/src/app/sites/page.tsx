@@ -261,7 +261,7 @@ function SitesPageContent() {
             email={userEmail}
             plan={plan}
             limit={limit}
-            usage={plan === "free" ? 4200 : plan === "pro" ? 34200 : 412000}
+            usage={0}
             onManageBilling={handleManageBilling}
             onAccountSettings={() => setShowAccountSettings(true)}
             onLogout={() => setShowConfirmLogout(true)}
@@ -459,7 +459,7 @@ function SitesPageContent() {
                     {/* Views */}
                     <div className="flex flex-col items-center justify-center border-x border-border-subtle">
                       <span className="text-xs font-semibold text-foreground">
-                        {plan === "free" ? "4.2k" : "34.2k"}
+                        0
                       </span>
                       <span className="text-[10px] text-muted mt-0.5">Pageviews</span>
                     </div>

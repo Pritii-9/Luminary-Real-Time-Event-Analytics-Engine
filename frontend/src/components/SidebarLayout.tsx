@@ -67,28 +67,28 @@ export default function SidebarLayout({
       {/* Sidebar */}
       <aside
         className={`flex flex-col border-r border-card-border bg-card/50 transition-all duration-200 ${
-          collapsed ? "w-14" : "w-56"
+          collapsed ? "w-16" : "w-60"
         }`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center gap-2.5 px-3.5 py-4 border-b border-card-border min-h-[56px]">
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-card-border min-h-[60px]">
           <button
             onClick={() => router.push("/sites")}
             className="flex-shrink-0 cursor-pointer"
             title="Back to sites"
           >
-            <Logo className="h-7 w-7" />
+            <Logo className="h-8 w-8" />
           </button>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-xs font-medium text-foreground truncate">{siteName || siteId}</p>
-              <p className="text-[10px] text-muted truncate">{siteDomain}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{siteName || siteId}</p>
+              <p className="text-xs text-muted truncate">{siteDomain}</p>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-2.5 py-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const isActive = activeKey === item.key;
             const Icon = item.icon;
@@ -97,13 +97,13 @@ export default function SidebarLayout({
                 key={item.key}
                 onClick={() => router.push(`${basePath}${item.path}`)}
                 title={collapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer ${
+                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                   isActive
-                    ? "bg-white/[0.06] text-foreground"
-                    : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
-                } ${collapsed ? "justify-center" : ""}`}
+                    ? "bg-white/[0.08] text-foreground font-semibold"
+                    : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                } ${collapsed ? "justify-center px-0" : ""}`}
               >
-                <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                <Icon className="h-4 w-4 flex-shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
               </button>
             );
@@ -111,13 +111,13 @@ export default function SidebarLayout({
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="border-t border-card-border px-2 py-2.5">
+        <div className="border-t border-card-border px-3 py-3">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="w-full flex items-center justify-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-muted hover:bg-white/[0.03] hover:text-foreground transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted hover:bg-white/[0.04] hover:text-foreground transition-colors cursor-pointer"
           >
-            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-            {!collapsed && <span className="text-[10px]">Collapse</span>}
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {!collapsed && <span>Collapse Sidebar</span>}
           </button>
         </div>
       </aside>
