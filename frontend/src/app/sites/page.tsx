@@ -12,6 +12,7 @@ import {
   SiteData,
   createCheckoutSession,
   createPortalSession,
+  fetchSummary,
 } from "@/lib/api";
 import CustomSelect from "@/components/CustomSelect";
 import {
@@ -54,6 +55,7 @@ function SitesPageContent() {
   const [userEmail, setUserEmail] = useState("");
   const [plan, setPlan] = useState("free");
   const [limit, setLimit] = useState(10000);
+  const [sitePageviews, setSitePageviews] = useState<Record<string, number>>({});
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -127,6 +129,20 @@ function SitesPageContent() {
       setPlan(user.plan);
       setLimit(user.monthly_pageview_limit);
       setSites(siteList);
+
+      // Fetch actual pageview counts for each site
+      const pageviewMap: Record<string, number> = {};
+      await Promise.all(
+        siteList.map(async (site) => {
+          try {
+            const summary = await fetchSummary(site.site_id, 30);
+            pageviewMap[site.site_id] = summary?.pageviews || 0;
+          } catch {
+            pageviewMap[site.site_id] = 0;
+          }
+        })
+      );
+      setSitePageviews(pageviewMap);
     } catch {
       router.push("/login");
     } finally {
@@ -261,7 +277,7 @@ function SitesPageContent() {
             email={userEmail}
             plan={plan}
             limit={limit}
-            usage={0}
+            usage={Object.values(sitePageviews).reduce((acc, curr) => acc + curr, 0)}
             onManageBilling={handleManageBilling}
             onAccountSettings={() => setShowAccountSettings(true)}
             onLogout={() => setShowConfirmLogout(true)}
@@ -459,7 +475,7 @@ function SitesPageContent() {
                     {/* Views */}
                     <div className="flex flex-col items-center justify-center border-x border-border-subtle">
                       <span className="text-xs font-semibold text-foreground">
-                        0
+                        {(sitePageviews[site.site_id] || 0).toLocaleString()}
                       </span>
                       <span className="text-[10px] text-muted mt-0.5">Pageviews</span>
                     </div>
