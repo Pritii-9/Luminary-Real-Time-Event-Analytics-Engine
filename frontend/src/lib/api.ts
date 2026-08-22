@@ -7,27 +7,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 let accessToken: string | null = null;
 
 export function setToken(token: string | null) {
+  // Keep token in-memory only. Rely on the httpOnly cookie set by the server
+  // for authenticated requests to avoid exposing tokens to XSS via localStorage.
   accessToken = token;
-  if (token) {
-    localStorage.setItem("luminary_token", token);
-  } else {
-    localStorage.removeItem("luminary_token");
-  }
 }
 
 export function getToken(): string | null {
-  if (accessToken) return accessToken;
-  if (typeof window !== "undefined") {
-    accessToken = localStorage.getItem("luminary_token");
-  }
+  // Do not read/restore token from localStorage. The server-set httpOnly
+  // cookie carries authentication for browser requests.
   return accessToken;
 }
 
 export function clearToken() {
   accessToken = null;
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("luminary_token");
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -38,12 +30,10 @@ async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 

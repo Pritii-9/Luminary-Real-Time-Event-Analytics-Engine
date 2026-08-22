@@ -65,6 +65,10 @@ async def register(body: RegisterRequest, request: Request, session: SQLSession 
     if await is_rate_limited(request, "auth_register", limit=5, window_seconds=300):
         raise HTTPException(status_code=429, detail="Too many registration attempts. Please try again later.")
 
+    # Server-side password strength check (enforce minimum length)
+    if not body.password or len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+
     existing = session.exec(select(User).where(User.email == body.email)).first()
     if existing:
         if existing.is_verified:
@@ -104,8 +108,9 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
         raise HTTPException(status_code=429, detail="Too many verification attempts. Please try again later.")
 
     user = session.exec(select(User).where(User.email == body.email)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Do not reveal whether the user exists to prevent user enumeration. If the
+    # user is not found, continue to OTP checks so the response is the same as
+    # for an invalid/expired OTP.
 
     # Check OTP in Redis or memory store
     stored_otp = None
@@ -176,11 +181,11 @@ async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSessi
         raise HTTPException(status_code=429, detail="Too many resend attempts. Please try again later.")
 
     user = session.exec(select(User).where(User.email == body.email)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="Email already verified")
+    # Do not reveal whether the user exists or whether the email is already
+    # verified to prevent user enumeration. If the user does not exist or is
+    # already verified, pretend a resend succeeded.
+    if not user or user.is_verified:
+        return MessageResponse(detail="If an account with that email exists, a verification email was sent")
 
     # Generate new OTP
     otp = f"{random.randint(100000, 999999)}"
@@ -198,9 +203,14 @@ async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSessi
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, response: Response, session: SQLSession = Depends(get_session)):
+async def login(body: LoginRequest, request: Request, response: Response, session: SQLSession = Depends(get_session)):
+    # Rate limit: Max 10 login attempts per 1 minute per IP
+    if await is_rate_limited(request, "auth_login", limit=10, window_seconds=60):
+        raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
+
     user = session.exec(select(User).where(User.email == body.email)).first()
     if not user or not verify_password(body.password, user.password_hash):
+        # Generic error to avoid user enumeration
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_verified:

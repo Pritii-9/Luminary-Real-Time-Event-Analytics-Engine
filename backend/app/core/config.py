@@ -1,6 +1,12 @@
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
+import logging
+import secrets
+from typing import Optional
+import logging
+import secrets
+from typing import Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -20,7 +26,7 @@ class Settings(BaseSettings):
     clickhouse_secure: bool = False
 
     # Auth / JWT
-    jwt_secret: str = "luminary-dev-secret-change-in-production"
+    jwt_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440  # 24 hours
 
@@ -50,3 +56,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# If JWT_SECRET is not set in the environment, generate an ephemeral secret for
+# local development and warn loudly. In production (Render, Vercel, etc.) set
+# the JWT_SECRET env var to a secure, random value so tokens cannot be forged.
+if not settings.jwt_secret:
+    logging.warning(
+        "JWT secret not set; generating an ephemeral secret for development. Set JWT_SECRET in the environment for production."
+    )
+    settings.jwt_secret = secrets.token_hex(32)
