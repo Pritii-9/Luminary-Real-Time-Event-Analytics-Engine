@@ -30,10 +30,13 @@ async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+
+  if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
@@ -52,8 +55,11 @@ async function apiFetch<T = any>(
     throw new Error(body.detail || `API error ${res.status}`);
   }
 
-  if (res.status === 204) return null as T;
-  return res.json();
+  if (res.status === 204) {
+    return null as T;
+  }
+
+  return (await res.json()) as T;
 }
 
 // ---------------------------------------------------------------------------
