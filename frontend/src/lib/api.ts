@@ -178,32 +178,40 @@ export async function deleteSite(siteId: string) {
 // Stats API
 // ---------------------------------------------------------------------------
 
-export async function fetchSummary(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/summary?site_id=${siteId}&days=${days}`);
+export type StatsRow = Record<string, string | number | null>;
+
+export interface StatsSummary {
+  pageviews: number;
+  visitors: number;
+  sessions: number;
 }
 
-export async function fetchTimeseries(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/timeseries?site_id=${siteId}&days=${days}`);
+export async function fetchSummary(siteId: string, days = 7): Promise<StatsSummary> {
+  return apiFetch<StatsSummary>(`/api/v1/stats/summary?site_id=${siteId}&days=${days}`);
 }
 
-export async function fetchPages(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/pages?site_id=${siteId}&days=${days}`);
+export async function fetchTimeseries(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/timeseries?site_id=${siteId}&days=${days}`);
 }
 
-export async function fetchReferrers(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/referrers?site_id=${siteId}&days=${days}`);
+export async function fetchPages(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/pages?site_id=${siteId}&days=${days}`);
 }
 
-export async function fetchDevices(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/devices?site_id=${siteId}&days=${days}`);
+export async function fetchReferrers(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/referrers?site_id=${siteId}&days=${days}`);
 }
 
-export async function fetchBrowsers(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/browsers?site_id=${siteId}&days=${days}`);
+export async function fetchDevices(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/devices?site_id=${siteId}&days=${days}`);
 }
 
-export async function fetchCountries(siteId: string, days = 7) {
-  return apiFetch(`/api/v1/stats/countries?site_id=${siteId}&days=${days}`);
+export async function fetchBrowsers(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/browsers?site_id=${siteId}&days=${days}`);
+}
+
+export async function fetchCountries(siteId: string, days = 7): Promise<StatsRow[]> {
+  return apiFetch<StatsRow[]>(`/api/v1/stats/countries?site_id=${siteId}&days=${days}`);
 }
 
 export async function fetchCustomEvents(siteId: string, days = 7) {
