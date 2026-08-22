@@ -26,7 +26,7 @@ export function clearToken() {
 // Fetch helper
 // ---------------------------------------------------------------------------
 
-async function apiFetch<T = any>(
+async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -69,13 +69,28 @@ async function apiFetch<T = any>(
 export interface AuthResponse {
   access_token: string;
   token_type: string;
-  user: { id: number; email: string };
+  user: {
+    id: number;
+    email: string;
+    full_name?: string | null;
+    company_name?: string | null;
+  };
 }
 
-export async function register(email: string, password: string) {
+export async function register(
+  email: string,
+  password: string,
+  fullName?: string,
+  companyName?: string
+) {
   return apiFetch<{ detail: string }>("/api/v1/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      full_name: fullName?.trim() || undefined,
+      company_name: companyName?.trim() || undefined,
+    }),
   });
 }
 

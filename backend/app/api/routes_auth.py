@@ -1,8 +1,8 @@
 """Auth API routes: register, login, logout, me, verify-otp, resend-otp."""
 
-import random
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session as SQLSession, select
 
 from app.core.auth import (
@@ -25,6 +25,8 @@ _otp_memory_store = {}
 class RegisterRequest(BaseModel):
     email: str
     password: str
+    full_name: str | None = Field(default=None, max_length=255)
+    company_name: str | None = Field(default=None, max_length=255)
 
 
 class LoginRequest(BaseModel):
@@ -44,6 +46,8 @@ class ResendOTPRequest(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    full_name: str | None = None
+    company_name: str | None = None
     plan: str
     subscription_status: str
     monthly_pageview_limit: int
@@ -75,17 +79,24 @@ async def register(body: RegisterRequest, request: Request, session: SQLSession 
             raise HTTPException(status_code=409, detail="Email already registered")
         # Existing but unverified: update password in case they changed it
         existing.password_hash = hash_password(body.password)
+        existing.full_name = body.full_name.strip() if body.full_name else None
+        existing.company_name = body.company_name.strip() if body.company_name else None
         session.add(existing)
         session.commit()
     else:
         # Create unverified user
-        user = User(email=body.email, password_hash=hash_password(body.password), is_verified=False)
+        user = User(
+            email=body.email,
+            password_hash=hash_password(body.password),
+            full_name=body.full_name.strip() if body.full_name else None,
+            company_name=body.company_name.strip() if body.company_name else None,
+            is_verified=False,
+        )
         session.add(user)
         session.commit()
 
-    # Generate 6-digit OTP
-    # Generate 6-digit OTP
-    otp = f"{random.randint(100000, 999999)}"
+    # Generate a six-digit OTP with a cryptographically secure source.
+    otp = f"{secrets.randbelow(900000) + 100000}"
 
     # Save OTP to Redis (or in-memory fallback)
     try:
@@ -130,7 +141,7 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
             else:
                 _otp_memory_store.pop(body.email, None)
 
-    if not stored_otp:
+    if not stored_otp or not user:
         raise HTTPException(status_code=400, detail="OTP expired or not found")
 
     if stored_otp != body.otp:
@@ -167,6 +178,8 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
         user=UserResponse(
             id=user.id,
             email=user.email,
+            full_name=user.full_name,
+            company_name=user.company_name,
             plan=user.plan,
             subscription_status=user.subscription_status or "active",
             monthly_pageview_limit=user.monthly_pageview_limit,
@@ -188,7 +201,7 @@ async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSessi
         return MessageResponse(detail="If an account with that email exists, a verification email was sent")
 
     # Generate new OTP
-    otp = f"{random.randint(100000, 999999)}"
+    otp = f"{secrets.randbelow(900000) + 100000}"
     try:
         await redis_client.set(f"otp:{body.email}", otp, ex=300)
     except Exception as e:
@@ -233,6 +246,8 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
         user=UserResponse(
             id=user.id,
             email=user.email,
+            full_name=user.full_name,
+            company_name=user.company_name,
             plan=user.plan,
             subscription_status=user.subscription_status or "active",
             monthly_pageview_limit=user.monthly_pageview_limit,
@@ -251,6 +266,8 @@ def me(user: User = Depends(get_current_user)):
     return UserResponse(
         id=user.id,
         email=user.email,
+        full_name=user.full_name,
+        company_name=user.company_name,
         plan=user.plan,
         subscription_status=user.subscription_status or "active",
         monthly_pageview_limit=user.monthly_pageview_limit,

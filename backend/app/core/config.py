@@ -1,17 +1,13 @@
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
-import logging
-import secrets
-from typing import Optional
-import logging
-import secrets
 from typing import Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
+    app_env: str = "development"
     redis_url: str = "redis://localhost:6379/0"
     redis_stream_key: str = "events:raw"
     redis_stream_maxlen: int = 100000
@@ -57,11 +53,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# If JWT_SECRET is not set in the environment, generate an ephemeral secret for
-# local development and warn loudly. In production (Render, Vercel, etc.) set
-# the JWT_SECRET env var to a secure, random value so tokens cannot be forged.
 if not settings.jwt_secret:
-    logging.warning(
-        "JWT secret not set; generating an ephemeral secret for development. Set JWT_SECRET in the environment for production."
-    )
-    settings.jwt_secret = secrets.token_hex(32)
+    raise RuntimeError("JWT_SECRET must be set")
+
+if settings.app_env.lower() == "production" and not settings.database_url:
+    raise RuntimeError("DATABASE_URL must be set when APP_ENV=production")
