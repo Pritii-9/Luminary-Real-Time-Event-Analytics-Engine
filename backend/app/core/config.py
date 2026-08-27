@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -47,8 +47,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3001"
     app_url: str = ""
 
-    class Config:
-        env_file = (os.path.join(BASE_DIR, ".env"), ".env")
+    model_config = SettingsConfigDict(env_file=(os.path.join(BASE_DIR, ".env"), ".env"), extra="ignore")
 
 
 settings = Settings()
