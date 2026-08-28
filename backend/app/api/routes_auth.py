@@ -1,7 +1,7 @@
 """Auth API routes: register, login, logout, me, verify-otp, resend-otp."""
 
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlmodel import Session as SQLSession, select
 
@@ -64,7 +64,7 @@ class MessageResponse(BaseModel):
 
 
 @router.post("/register", response_model=MessageResponse)
-async def register(body: RegisterRequest, request: Request, session: SQLSession = Depends(get_session)):
+async def register(body: RegisterRequest, request: Request, background_tasks: BackgroundTasks, session: SQLSession = Depends(get_session)):
     # Rate limit: Max 5 registration attempts per 5 minutes per IP
     if await is_rate_limited(request, "auth_register", limit=5, window_seconds=300):
         raise HTTPException(status_code=429, detail="Too many registration attempts. Please try again later.")
@@ -106,8 +106,8 @@ async def register(body: RegisterRequest, request: Request, session: SQLSession 
         logging.warning(f"Redis unavailable for OTP set: {e}")
         _otp_memory_store[body.email] = (otp, time.time() + 300)
 
-    # Send email (prints to console in development)
-    send_otp_email(body.email, otp)
+    # Send email in background (prints to console in development)
+    background_tasks.add_task(send_otp_email, body.email, otp)
 
     return MessageResponse(detail="Verification OTP sent to email")
 
@@ -188,7 +188,7 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
 
 
 @router.post("/resend-otp", response_model=MessageResponse)
-async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSession = Depends(get_session)):
+async def resend_otp(body: ResendOTPRequest, request: Request, background_tasks: BackgroundTasks, session: SQLSession = Depends(get_session)):
     # Rate limit: Max 3 OTP resends per 5 minutes per IP
     if await is_rate_limited(request, "auth_resend_otp", limit=3, window_seconds=300):
         raise HTTPException(status_code=429, detail="Too many resend attempts. Please try again later.")
@@ -209,7 +209,7 @@ async def resend_otp(body: ResendOTPRequest, request: Request, session: SQLSessi
         logging.warning(f"Redis unavailable for resend OTP: {e}")
         _otp_memory_store[body.email] = (otp, time.time() + 300)
 
-    send_otp_email(body.email, otp)
+    background_tasks.add_task(send_otp_email, body.email, otp)
 
     return MessageResponse(detail="Verification OTP resent successfully")
 

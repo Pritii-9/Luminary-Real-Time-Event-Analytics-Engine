@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_sender: str = "noreply@luminary.dev"
+    resend_api_key: str = ""
 
     # Stripe Settings
     stripe_secret_key: str = ""
