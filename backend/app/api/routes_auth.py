@@ -63,8 +63,8 @@ class MessageResponse(BaseModel):
     detail: str
 
 
-@router.post("/register", response_model=MessageResponse)
-async def register(body: RegisterRequest, request: Request, background_tasks: BackgroundTasks, session: SQLSession = Depends(get_session)):
+@router.post("/register", response_model=TokenResponse)
+async def register(body: RegisterRequest, request: Request, response: Response, session: SQLSession = Depends(get_session)):
     # Rate limit: Max 5 registration attempts per 5 minutes per IP
     if await is_rate_limited(request, "auth_register", limit=5, window_seconds=300):
         raise HTTPException(status_code=429, detail="Too many registration attempts. Please try again later.")
@@ -81,35 +81,49 @@ async def register(body: RegisterRequest, request: Request, background_tasks: Ba
         existing.password_hash = hash_password(body.password)
         existing.full_name = body.full_name.strip() if body.full_name else None
         existing.company_name = body.company_name.strip() if body.company_name else None
+        existing.is_verified = True
         session.add(existing)
         session.commit()
+        session.refresh(existing)
+        user = existing
     else:
-        # Create unverified user
+        # Create auto-verified user to bypass OTP
         user = User(
             email=body.email,
             password_hash=hash_password(body.password),
             full_name=body.full_name.strip() if body.full_name else None,
             company_name=body.company_name.strip() if body.company_name else None,
-            is_verified=False,
+            is_verified=True,
         )
         session.add(user)
         session.commit()
+        session.refresh(user)
 
-    # Generate a six-digit OTP with a cryptographically secure source.
-    otp = f"{secrets.randbelow(900000) + 100000}"
+    # Generate access token
+    token = create_access_token(user.id, user.email)
 
-    # Save OTP to Redis (or in-memory fallback)
-    try:
-        await redis_client.set(f"otp:{body.email}", otp, ex=300)
-    except Exception as e:
-        import logging, time
-        logging.warning(f"Redis unavailable for OTP set: {e}")
-        _otp_memory_store[body.email] = (otp, time.time() + 300)
+    # Also set HTTP-only cookie for browser convenience
+    response.set_cookie(
+        key="luminary_token",
+        value=token,
+        httponly=True,
+        samesite="none",
+        secure=True,
+        max_age=86400,
+    )
 
-    # Send email in background (prints to console in development)
-    background_tasks.add_task(send_otp_email, body.email, otp)
-
-    return MessageResponse(detail="Verification OTP sent to email")
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            company_name=user.company_name,
+            plan=user.plan,
+            subscription_status=user.subscription_status or "active",
+            monthly_pageview_limit=user.monthly_pageview_limit,
+        ),
+    )
 
 
 @router.post("/verify-otp", response_model=TokenResponse)

@@ -83,7 +83,7 @@ export async function register(
   fullName?: string,
   companyName?: string
 ) {
-  return apiFetch<{ detail: string }>("/api/v1/auth/register", {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/register", {
     method: "POST",
     body: JSON.stringify({
       email,
@@ -92,6 +92,8 @@ export async function register(
       company_name: companyName?.trim() || undefined,
     }),
   });
+  setToken(data.access_token);
+  return data;
 }
 
 export async function verifyOtp(email: string, otp: string) {

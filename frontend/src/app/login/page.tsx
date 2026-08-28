@@ -152,10 +152,10 @@ function AuthPageContent() {
         }, 800);
       } else {
         await register(email, password, fullName, companyName);
-        setToast({ message: "Verification code sent to your email.", type: "success" });
-        setMode("verify_otp");
-        setOtp("");
-        setOtpError("");
+        setToast({ message: "Account created. Redirecting...", type: "success" });
+        setTimeout(() => {
+          router.push("/sites");
+        }, 800);
       }
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, "Authentication error.");
