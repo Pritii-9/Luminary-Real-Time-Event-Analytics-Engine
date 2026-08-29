@@ -1,5 +1,5 @@
 import { useEffect, useState, use } from "react";
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Outlet } from 'react-router-dom';
 import { getMe, getSite, getToken, logout, createPortalSession, type SiteData } from "@/lib/api";
 import SidebarLayout from "@/components/SidebarLayout";
 import AccountSettingsModal from "@/components/AccountSettingsModal";
@@ -72,7 +72,7 @@ export default function DashboardLayout({
         onAccountSettings={() => setShowAccountSettings(true)}
         onLogout={() => setShowConfirmLogout(true)}
       >
-        {children}
+        {children || <Outlet />}
       </SidebarLayout>
 
       <AccountSettingsModal
