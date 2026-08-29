@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { User, Shield, CreditCard, CheckCircle, X } from "lucide-react";
 

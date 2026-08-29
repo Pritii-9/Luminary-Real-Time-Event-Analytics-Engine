@@ -1,7 +1,5 @@
-"use client";
-
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, User, CreditCard, Settings, LogOut } from "lucide-react";
 
 interface UserDropdownProps {
@@ -42,7 +40,7 @@ export default function UserDropdown({
 }: UserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -97,7 +95,7 @@ export default function UserDropdown({
       } catch (err) {
         console.error("Logout error:", err);
       } finally {
-        router.push("/login");
+        navigate("/login");
       }
     }
   };

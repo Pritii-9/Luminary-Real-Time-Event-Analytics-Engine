@@ -1,7 +1,5 @@
-"use client";
-
 import React, { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3, FileText, Globe, Zap, Code, MousePointer2,
   Megaphone, Download, ChevronLeft, ChevronRight,
@@ -48,8 +46,8 @@ export default function SidebarLayout({
   onLogout,
   children,
 }: SidebarLayoutProps) {
-  const router = useRouter();
-  const pathname = usePathname();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
   const basePath = `/dashboard/${siteId}`;
@@ -73,7 +71,7 @@ export default function SidebarLayout({
         {/* Sidebar Header */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-card-border min-h-[60px]">
           <button
-            onClick={() => router.push("/sites")}
+            onClick={() => navigate("/sites")}
             className="flex-shrink-0 cursor-pointer"
             title="Back to sites"
           >
@@ -95,7 +93,7 @@ export default function SidebarLayout({
             return (
               <button
                 key={item.key}
-                onClick={() => router.push(`${basePath}${item.path}`)}
+                onClick={() => navigate(`${basePath}${item.path}`)}
                 title={collapsed ? item.label : undefined}
                 className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
                   isActive

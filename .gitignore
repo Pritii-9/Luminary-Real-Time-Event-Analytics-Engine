@@ -24,3 +24,10 @@ node_modules/
 
 # GeoIP
 *.mmdb
+
+# Migration Backups & Scripts
+frontend_old/
+frontend/migrate.js
+frontend/migrate.cjs
+frontend/fix_imports.cjs
+frontend/fix_imports_2.cjs
