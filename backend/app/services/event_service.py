@@ -45,12 +45,13 @@ def enrich_event(event: EventIn, request: Request) -> dict:
     user_agent = request.headers.get("user-agent", "")
     site_id = resolve_site_id(event)
 
-    # Dynamic GDPR-compliant IDs (eliminates cookies and client-side storage requirements)
-    visitor_id = hashlib.sha256(f"{ip_hash}-{site_id}-{user_agent}".encode()).hexdigest()
+    # Use client-provided IDs if available (from localStorage/sessionStorage) to accurately track returning visitors
+    # across IP changes or days. Fallback to IP/UA fingerprint if client storage is disabled.
+    final_visitor_id = event.visitor_id if event.visitor_id else hashlib.sha256(f"{ip_hash}-{site_id}-{user_agent}".encode()).hexdigest()
     
     import math
     session_window = math.floor(time.time() / 1800)  # 30 minute window
-    session_id = hashlib.sha256(f"{ip_hash}-{site_id}-{user_agent}-{session_window}".encode()).hexdigest()
+    final_session_id = event.session_id if event.session_id else hashlib.sha256(f"{ip_hash}-{site_id}-{user_agent}-{session_window}".encode()).hexdigest()
 
     return {
         "event_id": str(uuid.uuid4()),
@@ -61,8 +62,8 @@ def enrich_event(event: EventIn, request: Request) -> dict:
         "url": str(event.url),
         "path": event.path,
         "referrer": event.referrer or "",
-        "session_id": session_id,
-        "visitor_id": visitor_id,
+        "session_id": final_session_id,
+        "visitor_id": final_visitor_id,
         "screen": event.screen or "",
         "ip_hash": ip_hash,
 
