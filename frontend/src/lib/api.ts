@@ -4,22 +4,31 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 // Token management
 // ---------------------------------------------------------------------------
 
-let accessToken: string | null = null;
+let accessToken: string | null = typeof localStorage !== "undefined" ? localStorage.getItem("luminary_token") : null;
 
 export function setToken(token: string | null) {
-  // Keep token in-memory only. Rely on the httpOnly cookie set by the server
-  // for authenticated requests to avoid exposing tokens to XSS via localStorage.
   accessToken = token;
+  if (typeof localStorage !== "undefined") {
+    if (token) {
+      localStorage.setItem("luminary_token", token);
+    } else {
+      localStorage.removeItem("luminary_token");
+    }
+  }
 }
 
 export function getToken(): string | null {
-  // Do not read/restore token from localStorage. The server-set httpOnly
-  // cookie carries authentication for browser requests.
+  if (!accessToken && typeof localStorage !== "undefined") {
+    accessToken = localStorage.getItem("luminary_token");
+  }
   return accessToken;
 }
 
 export function clearToken() {
   accessToken = null;
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem("luminary_token");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +53,7 @@ async function apiFetch<T = unknown>(
 
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
       window.location.href = "/login";
     }
     throw new Error("Unauthorized");

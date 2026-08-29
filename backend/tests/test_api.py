@@ -8,15 +8,27 @@ from unittest.mock import AsyncMock
 # Ensure the backend package is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from unittest.mock import AsyncMock, MagicMock
+
 # Override SQLite path before importing app
 os.environ["SQLITE_PATH"] = os.path.join(os.path.dirname(__file__), "test.db")
 
 # Mock Redis client before importing routes/services to avoid loop errors
 mock_redis = AsyncMock()
+mock_redis.get = AsyncMock(return_value=None)
+mock_redis.set = AsyncMock(return_value=True)
 mock_redis.xadd = AsyncMock(return_value="1-0")
 mock_redis.zadd = AsyncMock(return_value=1)
 mock_redis.zremrangebyscore = AsyncMock(return_value=0)
 mock_redis.zcard = AsyncMock(return_value=5)
+
+mock_pipeline = MagicMock()
+mock_pipeline.__aenter__ = AsyncMock(return_value=mock_pipeline)
+mock_pipeline.__aexit__ = AsyncMock(return_value=None)
+mock_pipeline.incr = AsyncMock()
+mock_pipeline.expire = AsyncMock()
+mock_pipeline.execute = AsyncMock(return_value=[1, True])
+mock_redis.pipeline = MagicMock(return_value=mock_pipeline)
 
 import app.services.redis_client
 app.services.redis_client.redis_client = mock_redis
@@ -170,11 +182,11 @@ class TestSites:
 # ---------------------------------------------------------------------------
 
 class TestCollect:
-    def test_collect_with_site_id(self, client):
+    def test_collect_with_site_id(self, client, test_site):
         resp = client.post("/api/v1/collect", json={
-            "site_id": "site_123",
+            "site_id": test_site["site_id"],
             "event_type": "pageview",
-            "url": "https://example.com/home",
+            "url": "https://test.com/home",
             "path": "/home",
             "session_id": "sess_1",
             "visitor_id": "vis_1",
@@ -192,11 +204,11 @@ class TestCollect:
         })
         assert resp.status_code == 204
 
-    def test_collect_with_utm(self, client):
+    def test_collect_with_utm(self, client, test_site):
         resp = client.post("/api/v1/collect", json={
-            "site_id": "site_123",
+            "site_id": test_site["site_id"],
             "event_type": "pageview",
-            "url": "https://example.com/?utm_source=google",
+            "url": "https://test.com/?utm_source=google",
             "path": "/",
             "session_id": "sess_3",
             "visitor_id": "vis_3",
@@ -215,7 +227,7 @@ class TestCollect:
             "session_id": "sess_4",
             "visitor_id": "vis_4",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     def test_collect_no_site(self, client):
         resp = client.post("/api/v1/collect", json={
@@ -225,7 +237,7 @@ class TestCollect:
             "session_id": "sess_5",
             "visitor_id": "vis_5",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------

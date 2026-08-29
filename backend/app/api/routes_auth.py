@@ -63,7 +63,7 @@ class MessageResponse(BaseModel):
     detail: str
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(body: RegisterRequest, request: Request, response: Response, session: SQLSession = Depends(get_session)):
     # Rate limit: Max 5 registration attempts per 5 minutes per IP
     if await is_rate_limited(request, "auth_register", limit=5, window_seconds=300):
@@ -103,12 +103,14 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     token = create_access_token(user.id, user.email)
 
     # Also set HTTP-only cookie for browser convenience
+    is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
+    samesite_val = "none" if is_secure else "lax"
     response.set_cookie(
         key="luminary_token",
         value=token,
         httponly=True,
-        samesite="none",
-        secure=True,
+        samesite=samesite_val,
+        secure=is_secure,
         max_age=86400,
     )
 
@@ -178,12 +180,14 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
     token = create_access_token(user.id, user.email)
 
     # Also set HTTP-only cookie for browser convenience
+    is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
+    samesite_val = "none" if is_secure else "lax"
     response.set_cookie(
         key="luminary_token",
         value=token,
         httponly=True,
-        samesite="none",
-        secure=True,
+        samesite=samesite_val,
+        secure=is_secure,
         max_age=86400,
     )
 
@@ -246,12 +250,14 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
     token = create_access_token(user.id, user.email)
 
     # Also set HTTP-only cookie for browser convenience
+    is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
+    samesite_val = "none" if is_secure else "lax"
     response.set_cookie(
         key="luminary_token",
         value=token,
         httponly=True,
-        samesite="none",
-        secure=True,
+        samesite=samesite_val,
+        secure=is_secure,
         max_age=86400,
     )
 
