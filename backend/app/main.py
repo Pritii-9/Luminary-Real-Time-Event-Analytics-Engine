@@ -32,6 +32,7 @@ if "https://luminary-web-event-engine.vercel.app" not in origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

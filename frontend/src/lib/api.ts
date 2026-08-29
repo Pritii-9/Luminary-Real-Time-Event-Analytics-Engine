@@ -40,7 +40,7 @@ async function apiFetch<T = unknown>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_URL}${path}`, { credentials: "include", ...options, headers });
 
   if (res.status === 401) {
     clearToken();
