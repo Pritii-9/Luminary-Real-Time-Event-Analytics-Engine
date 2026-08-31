@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
@@ -34,7 +35,7 @@ async def create_checkout_session(
     if body.plan not in ["pro", "enterprise"]:
         raise HTTPException(status_code=400, detail="Invalid plan selected")
 
-    origin = request.headers.get("origin") or settings.frontend_url
+    origin = request.headers.get("origin") or settings.frontend_url or "http://localhost:5173"
 
     # Mock upgrade flow for easy local testing
     if not settings.stripe_secret_key:
@@ -48,12 +49,13 @@ async def create_checkout_session(
             session.commit()
             
             try:
+                import asyncio
                 from app.core.database import Site
                 sites = session.exec(select(Site).where(Site.user_id == user.id)).all()
                 for site in sites:
                     from app.services.redis_client import redis_client
-                    await redis_client.delete(f"site_details:{site.site_id}")
-                    await redis_client.delete(f"site_details:{site.public_token}")
+                    await asyncio.wait_for(redis_client.delete(f"site_details:{site.site_id}"), timeout=0.5)
+                    await asyncio.wait_for(redis_client.delete(f"site_details:{site.public_token}"), timeout=0.5)
             except Exception as e:
                 logging.error(f"Error clearing cache: {e}")
 

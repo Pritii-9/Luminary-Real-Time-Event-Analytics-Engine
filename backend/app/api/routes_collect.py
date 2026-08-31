@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 from urllib.parse import urlparse
 from sqlmodel import Session, select
@@ -155,29 +156,41 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     quota_key = f"quota:{details['site_id']}:{month_str}"
     
     try:
-        current_usage = await redis_client.get(quota_key)
-        if current_usage and int(current_usage) >= details["monthly_pageview_limit"]:
+        async def _check_quota():
+            current_usage = await redis_client.get(quota_key)
+            if current_usage and int(current_usage) >= details["monthly_pageview_limit"]:
+                return True, int(current_usage)
+            async with redis_client.pipeline(transaction=True) as pipe:
+                await pipe.incr(quota_key)
+                if not current_usage:
+                    await pipe.expire(quota_key, 35 * 86400)
+                await pipe.execute()
+            return False, 0
+
+        is_exceeded, _ = await asyncio.wait_for(_check_quota(), timeout=0.5)
+        if is_exceeded:
             raise HTTPException(
                 status_code=402, 
                 detail="Monthly event quota exceeded. Please upgrade your subscription plan."
             )
-            
-        async with redis_client.pipeline(transaction=True) as pipe:
-            await pipe.incr(quota_key)
-            if not current_usage:
-                await pipe.expire(quota_key, 35 * 86400)
-            await pipe.execute()
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error(f"Quota check error for site {details['site_id']}: {exc}")
+        logging.error(f"Quota check fail-open for site {details['site_id']}: {exc}")
 
     # 5. Ingest event
     payload = enrich_event(event, request)
 
-    # Publish to Redis Queue & update real-time stream
-    await publish_event(payload)
-    await update_realtime(payload)
+    # Publish to Redis Queue & update real-time stream (fail-open timeout)
+    try:
+        await asyncio.wait_for(publish_event(payload), timeout=0.5)
+    except Exception as exc:
+        logging.error(f"Publish event timeout/error: {exc}")
+
+    try:
+        await asyncio.wait_for(update_realtime(payload), timeout=0.5)
+    except Exception as exc:
+        logging.error(f"Update realtime timeout/error: {exc}")
 
     # Always persist event directly to DB so metrics update immediately without worker dependency
     try:

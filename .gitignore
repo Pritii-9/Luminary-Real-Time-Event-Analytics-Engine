@@ -31,3 +31,6 @@ frontend/migrate.js
 frontend/migrate.cjs
 frontend/fix_imports.cjs
 frontend/fix_imports_2.cjs
+
+# Local Docs & Study Guides
+docs/

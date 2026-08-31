@@ -47,21 +47,29 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security_scheme = HTTPBearer(auto_error=False)
+
 # ---------------------------------------------------------------------------
 # FastAPI dependency: get current authenticated user
 # ---------------------------------------------------------------------------
 
 def get_current_user(
     request: Request,
+    token_credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     session: SQLSession = Depends(get_session),
 ) -> User:
-    # Try Authorization header first, then cookie
+    # Try HTTPBearer header first, then Authorization header, then cookie
     token: Optional[str] = None
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
+    if token_credentials:
+        token = token_credentials.credentials
     else:
-        token = request.cookies.get("luminary_token")
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = request.cookies.get("luminary_token")
 
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
