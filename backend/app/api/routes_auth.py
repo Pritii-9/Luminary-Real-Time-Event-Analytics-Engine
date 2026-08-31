@@ -276,8 +276,10 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
 
 
 @router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie("luminary_token")
+def logout(request: Request, response: Response):
+    is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
+    samesite_val = "none" if is_secure else "lax"
+    response.delete_cookie("luminary_token", path="/", samesite=samesite_val, secure=is_secure)
     return {"detail": "Logged out"}
 
 

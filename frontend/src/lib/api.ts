@@ -133,6 +133,9 @@ export async function login(email: string, password: string) {
 export async function logout() {
   await apiFetch("/api/v1/auth/logout", { method: "POST" }).catch(() => {});
   clearToken();
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
 }
 
 export async function getMe() {
