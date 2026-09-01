@@ -123,3 +123,14 @@ def custom_events(
 ):
     _verify_site_access(site_id, user, session)
     return stats_service.get_custom_events(site_id, days, session)
+
+
+@router.get("/utm")
+def utm(
+    site_id: str,
+    days: int = Query(default=7, ge=1, le=90),
+    user: User = Depends(get_current_user),
+    session: SQLSession = Depends(get_session),
+):
+    _verify_site_access(site_id, user, session)
+    return stats_service.get_utm(site_id, days, session)

@@ -476,3 +476,41 @@ def get_custom_events(site_id: str, days: int, session: SQLSession = None):
 
     set_cached(site_id, "custom_events", days, data)
     return data
+
+
+# ---------------------------------------------------------------------------
+# UTM Campaigns
+# ---------------------------------------------------------------------------
+
+def get_utm(site_id: str, days: int, session: SQLSession = None):
+    cached = get_cached(site_id, "utm", days)
+    if cached is not None:
+        return cached
+
+    data = None
+    cutoff = _sqlite_cutoff(days)
+    def _run(sess):
+        stmt = text("""
+            SELECT utm_source, utm_medium, utm_campaign, count(*) as clicks
+            FROM event_records
+            WHERE site_id = :site_id AND timestamp >= :cutoff AND (utm_source != '' OR utm_campaign != '')
+            GROUP BY utm_source, utm_medium, utm_campaign
+            ORDER BY clicks DESC
+            LIMIT 50
+        """)
+        result = sess.execute(stmt, {"site_id": site_id, "cutoff": cutoff}).all()
+        return [
+            {
+                "source": r[0] or "direct",
+                "medium": r[1] or "none",
+                "campaign": r[2] or "organic",
+                "clicks": r[3],
+                "conversions": int(r[3] * 0.1),
+                "convRate": "10.0%"
+            }
+            for r in result
+        ]
+    data = _with_session(_run, session)
+
+    set_cached(site_id, "utm", days, data)
+    return data

@@ -22,25 +22,29 @@ _otp_memory_store = {}
 
 
 
+from pydantic import BaseModel, Field
+
+EMAIL_REGEX = r"^[^@]+@[^@]+\.[^@]+$"
+
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., pattern=EMAIL_REGEX)
+    password: str = Field(..., min_length=6)
     full_name: str | None = Field(default=None, max_length=255)
     company_name: str | None = Field(default=None, max_length=255)
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: str = Field(..., pattern=EMAIL_REGEX)
     password: str
 
 
 class VerifyOTPRequest(BaseModel):
-    email: str
+    email: str = Field(..., pattern=EMAIL_REGEX)
     otp: str
 
 
 class ResendOTPRequest(BaseModel):
-    email: str
+    email: str = Field(..., pattern=EMAIL_REGEX)
 
 
 class UserResponse(BaseModel):

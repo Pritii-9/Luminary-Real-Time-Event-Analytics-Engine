@@ -35,7 +35,7 @@ export function clearToken() {
 // Fetch helper
 // ---------------------------------------------------------------------------
 
-async function apiFetch<T = unknown>(
+export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -261,4 +261,8 @@ export async function fetchActiveUsers(siteId: string) {
 
 export function getRealtimeStreamUrl(siteId: string) {
   return `${API_URL}/api/v1/realtime/stream?site_id=${siteId}`;
+}
+
+export async function fetchUtm(siteId: string, days: number = 7) {
+  return apiFetch<any[]>(`/api/v1/stats/utm?site_id=${siteId}&days=${days}`);
 }

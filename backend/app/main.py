@@ -26,20 +26,45 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Luminary Analytics Engine", lifespan=lifespan)
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
-if "https://luminary-web-event-engine.vercel.app" not in origins:
-    origins.append("https://luminary-web-event-engine.vercel.app")
+default_origins = [
+    "https://luminary-web-event-engine.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174"
+]
+for origin in default_origins:
+    if origin not in origins:
+        origins.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+from fastapi import Request, Response
+
 @app.middleware("http")
-async def add_pna_header(request, call_next):
+async def public_collect_cors_middleware(request: Request, call_next):
+    if request.url.path.startswith("/api/v1/collect"):
+        if request.method == "OPTIONS":
+            response = Response()
+        else:
+            response = await call_next(request)
+            
+        origin = request.headers.get("origin")
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    return await call_next(request)
+
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response

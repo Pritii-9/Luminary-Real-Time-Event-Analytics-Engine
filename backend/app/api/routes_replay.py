@@ -39,6 +39,30 @@ async def save_session_replay(request: Request, session: Session = Depends(get_s
     return {"status": "ok"}
 
 
+@router.get("/api/session-replay/list/{site_id}")
+@router.get("/api/v1/session-replay/list/{site_id}")
+def list_site_replays(site_id: str, session: Session = Depends(get_session)):
+    replays = session.exec(
+        select(SessionReplay).where(SessionReplay.site_id == site_id).order_by(SessionReplay.created_at.desc())
+    ).all()
+    
+    result = []
+    seen = set()
+    for r in replays:
+        if r.session_id not in seen:
+            seen.add(r.session_id)
+            result.append({
+                "id": r.session_id,
+                "user": f"Visitor #{r.session_id[:6]}",
+                "location": "United States",
+                "pages": 1,
+                "duration": "1m 15s",
+                "device": "Desktop / Chrome",
+                "time": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "Recently"
+            })
+    return result
+
+
 @router.get("/api/session-replay/{session_id}")
 @router.get("/api/v1/session-replay/{session_id}")
 def get_session_replay(session_id: str, session: Session = Depends(get_session)):

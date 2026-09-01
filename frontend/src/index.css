@@ -11,7 +11,7 @@
 
 :root {
   --background: #09090b;       /* zinc-950 */
-  --foreground: #fafafa;       /* zinc-50 */
+  --foreground: #e4e4e7;       /* zinc-200 (softer than pure white to reduce glare) */
   --card: #18181b;             /* zinc-900 */
   --card-border: rgba(255, 255, 255, 0.06);
   --accent: #a1a1aa;           /* zinc-400 — monochrome white accent */
@@ -26,7 +26,7 @@
 /* Light mode */
 .light {
   --background: #fafafa;       /* zinc-50 */
-  --foreground: #18181b;       /* zinc-900 */
+  --foreground: #27272a;       /* zinc-800 (softer than stark black) */
   --card: #ffffff;
   --card-border: rgba(0, 0, 0, 0.06);
   --accent: #3f3f46;           /* zinc-700 */

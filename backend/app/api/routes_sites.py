@@ -14,9 +14,11 @@ from app.core.database import Site, User, get_session
 router = APIRouter(prefix="/api/v1/sites", tags=["sites"])
 
 
+from pydantic import BaseModel, Field
+
 class CreateSiteRequest(BaseModel):
-    name: str
-    domain: str
+    name: str = Field(..., min_length=3, max_length=100)
+    domain: str = Field(..., min_length=3, max_length=255, pattern=r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
 class SiteResponse(BaseModel):
@@ -139,3 +141,33 @@ def delete_site(
     session.delete(site)
     session.commit()
     return None
+
+
+class UpdateSiteRequest(BaseModel):
+    domain: str | None = Field(default=None, min_length=3, max_length=255, pattern=r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    name: str | None = Field(default=None, min_length=3, max_length=100)
+
+
+@router.patch("/{site_id}")
+def update_site(
+    site_id: str,
+    body: UpdateSiteRequest,
+    user: User = Depends(get_current_user),
+    session: SQLSession = Depends(get_session),
+):
+    site = session.exec(
+        select(Site).where(Site.site_id == site_id, Site.user_id == user.id)
+    ).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    if body.domain is not None:
+        site.domain = body.domain
+    if body.name is not None:
+        site.name = body.name
+
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    return _site_to_response(site)
+

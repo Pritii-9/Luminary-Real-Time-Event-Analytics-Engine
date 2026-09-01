@@ -1,19 +1,46 @@
 import { useParams } from 'react-router-dom';
-import { useState, use } from "react";
-import { MousePointer2, Play, } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MousePointer2, Play, VideoOff, RefreshCw } from "lucide-react";
+import { apiFetch } from "../../lib/api";
+
+interface ReplaySessionItem {
+  id: string;
+  user: string;
+  location: string;
+  pages: number;
+  duration: string;
+  device: string;
+  time: string;
+}
 
 export default function ReplaysPage() {
-  const {  siteId  } = useParams();
+  const { siteId } = useParams();
   const [days, setDays] = useState(30);
+  const [replaySessions, setReplaySessions] = useState<ReplaySessionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Replay sessions telemetry data
-  const replaySessions = [
-    { id: "ses_9a4f21", user: "Visitor #4920", location: "United States", pages: 4, duration: "2m 14s", device: "Desktop / Chrome", time: "10 mins ago" },
-    { id: "ses_8b1e77", user: "Visitor #4919", location: "Germany", pages: 7, duration: "4m 52s", device: "Desktop / Firefox", time: "28 mins ago" },
-    { id: "ses_7c8d32", user: "Visitor #4918", location: "India", pages: 3, duration: "1m 05s", device: "Mobile / Safari", time: "1 hour ago" },
-    { id: "ses_6d9a10", user: "Visitor #4917", location: "United Kingdom", pages: 12, duration: "8m 40s", device: "Desktop / Edge", time: "2 hours ago" },
-    { id: "ses_5e2c88", user: "Visitor #4916", location: "Canada", pages: 2, duration: "0m 45s", device: "Mobile / Chrome", time: "3 hours ago" },
-  ];
+  const fetchReplays = () => {
+    if (!siteId) return;
+    setIsLoading(true);
+    apiFetch<ReplaySessionItem[]>(`/api/v1/session-replay/list/${siteId}`)
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setReplaySessions(data);
+        } else {
+          setReplaySessions([]);
+        }
+      })
+      .catch(() => {
+        setReplaySessions([]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchReplays();
+  }, [siteId]);
 
   return (
     <div className="max-w-6xl animate-fade-in space-y-6">
@@ -21,11 +48,20 @@ export default function ReplaysPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Session Replays & Telemetry</h1>
           <p className="text-xs text-muted mt-1">
-            Replay user journeys, cursor movements, clicks, and page transitions.
+            Replay live user journeys, cursor movements, clicks, and page transitions.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={fetchReplays}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-card-border bg-card text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-accent" : "text-muted"}`} />
+            <span>Refresh</span>
+          </button>
+
           <div className="flex rounded-md border border-card-border overflow-hidden">
             {[7, 14, 30, 90].map((d) => (
               <button
@@ -54,43 +90,58 @@ export default function ReplaysPage() {
           <span className="col-span-2 text-right">Replay</span>
         </div>
 
-        <div className="divide-y divide-border-subtle">
-          {replaySessions.map((s) => (
-            <div key={s.id} className="grid grid-cols-12 gap-4 items-center px-4 py-3 hover:bg-white/[0.02] transition-colors">
-              <div className="col-span-3 flex items-center gap-2.5 min-w-0">
-                <MousePointer2 className="h-3.5 w-3.5 text-muted shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-mono font-medium text-foreground truncate">{s.user}</p>
-                  <p className="text-[10px] text-muted font-mono">{s.id}</p>
+        {isLoading ? (
+          <div className="p-12 text-center text-xs text-muted">
+            <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-accent" />
+            Loading real-time session replays...
+          </div>
+        ) : replaySessions.length === 0 ? (
+          <div className="p-12 text-center">
+            <VideoOff className="h-8 w-8 text-muted/40 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-foreground">No Recorded Sessions Yet</p>
+            <p className="text-xs text-muted max-w-sm mx-auto mt-1">
+              Install your Luminary tracking script on your website to start recording visitor mouse trajectories and clicks in real time.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border-subtle">
+            {replaySessions.map((s) => (
+              <div key={s.id} className="grid grid-cols-12 gap-4 items-center px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                <div className="col-span-3 flex items-center gap-2.5 min-w-0">
+                  <MousePointer2 className="h-3.5 w-3.5 text-muted shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-mono font-medium text-foreground truncate">{s.user}</p>
+                    <p className="text-[10px] text-muted font-mono">{s.id}</p>
+                  </div>
+                </div>
+
+                <div className="col-span-3 text-xs text-muted min-w-0">
+                  <p className="text-foreground truncate">{s.location}</p>
+                  <p className="text-[10px] text-muted truncate">{s.device}</p>
+                </div>
+
+                <span className="col-span-2 text-xs font-semibold text-foreground text-right tabular-nums">
+                  {s.pages}
+                </span>
+
+                <div className="col-span-2 text-right text-xs">
+                  <span className="font-mono text-foreground tabular-nums">{s.duration}</span>
+                  <p className="text-[10px] text-muted">{s.time}</p>
+                </div>
+
+                <div className="col-span-2 flex justify-end">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <Play className="h-3 w-3 fill-foreground" />
+                    <span>Play</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="col-span-3 text-xs text-muted min-w-0">
-                <p className="text-foreground truncate">{s.location}</p>
-                <p className="text-[10px] text-muted truncate">{s.device}</p>
-              </div>
-
-              <span className="col-span-2 text-xs font-semibold text-foreground text-right tabular-nums">
-                {s.pages}
-              </span>
-
-              <div className="col-span-2 text-right text-xs">
-                <span className="font-mono text-foreground tabular-nums">{s.duration}</span>
-                <p className="text-[10px] text-muted">{s.time}</p>
-              </div>
-
-              <div className="col-span-2 flex justify-end">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <Play className="h-3 w-3 fill-foreground" />
-                  <span>Play</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

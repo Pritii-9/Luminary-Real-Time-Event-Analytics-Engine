@@ -182,8 +182,8 @@ function AuthPageContent() {
 
       <div className="w-full max-w-sm animate-fade-in">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-9 w-9 mb-3" />
-          <h1 className="text-lg font-semibold text-foreground">Luminary Analytics</h1>
+          <Logo className="h-14 w-14 mb-4 rounded-2xl" />
+          <h1 className="text-xl font-bold text-foreground tracking-tight">Luminary Analytics</h1>
           <p className="text-[10px] text-muted uppercase tracking-[0.2em] font-medium mt-1">
             Privacy-First Web Telemetry
           </p>

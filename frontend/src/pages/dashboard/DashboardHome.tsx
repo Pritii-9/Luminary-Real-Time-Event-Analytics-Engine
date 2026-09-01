@@ -34,31 +34,37 @@ export default function DashboardHome() {
   useEffect(() => {
     if (!getToken()) { navigate("/login"); return; }
     loadData();
+
+    // Silent background polling every 30s
+    const pollInterval = setInterval(() => {
+      silentLoadData();
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, [siteId as string, days]);
 
   useEffect(() => {
     if (!siteId) return;
     const interval = setInterval(async () => {
       try {
-        const data = await fetchActiveUsers(siteId as string as string);
+        const data = await fetchActiveUsers(siteId as string);
         setActiveVisitors(data.active_visitors);
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
   }, [siteId]);
 
-  async function loadData() {
-    setLoading(true);
+  async function silentLoadData() {
     try {
       const [sumData, tsData, pgData, refData, devData, activeData, customData] =
         await Promise.all([
-          fetchSummary(siteId as string as string, days).catch(() => null),
-          fetchTimeseries(siteId as string as string, days).catch(() => []),
-          fetchPages(siteId as string as string, days).catch(() => []),
-          fetchReferrers(siteId as string as string, days).catch(() => []),
-          fetchDevices(siteId as string as string, days).catch(() => []),
-          fetchActiveUsers(siteId as string as string).catch(() => null),
-          fetchCustomEvents(siteId as string as string, days).catch(() => []),
+          fetchSummary(siteId as string, days).catch(() => null),
+          fetchTimeseries(siteId as string, days).catch(() => []),
+          fetchPages(siteId as string, days).catch(() => []),
+          fetchReferrers(siteId as string, days).catch(() => []),
+          fetchDevices(siteId as string, days).catch(() => []),
+          fetchActiveUsers(siteId as string).catch(() => null),
+          fetchCustomEvents(siteId as string, days).catch(() => []),
         ]);
 
       if (sumData) setSummary(sumData);
@@ -69,10 +75,14 @@ export default function DashboardHome() {
       if (customData) setCustomEvents(customData);
       setActiveVisitors(activeData?.active_visitors || 0);
     } catch (err) {
-      console.error("Dashboard load error", err);
-    } finally {
-      setLoading(false);
+      console.error("Dashboard silent poll error", err);
     }
+  }
+
+  async function loadData() {
+    setLoading(true);
+    await silentLoadData();
+    setLoading(false);
   }
 
   if (loading) {
@@ -88,31 +98,39 @@ export default function DashboardHome() {
 
   return (
     <div className="max-w-7xl animate-fade-in">
-      {/* Days filter + Live badge */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex rounded-md border border-card-border overflow-hidden">
-          {[7, 14, 30].map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                days === d
-                  ? "bg-foreground text-background"
-                  : "text-muted hover:bg-white/5 hover:text-foreground"
-              }`}
-            >
-              {d}d
-            </button>
-          ))}
+      {/* Days filter + Live badge — full-width bar, same baseline */}
+      <div className="flex items-center justify-between mb-6">
+        {/* Left: date range pills */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted font-medium hidden sm:block">Range:</span>
+          <div className="flex rounded-md border border-card-border overflow-hidden">
+            {[7, 14, 30].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                  days === d
+                    ? "bg-foreground text-background font-semibold"
+                    : "text-muted hover:bg-white/5 hover:text-foreground"
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-card-border px-3 py-1.5">
+
+        {/* Right: live visitors pill */}
+        <div className="flex items-center gap-2 rounded-md border border-card-border bg-card px-3 py-1.5">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"></span>
           </span>
-          <span className="text-xs font-medium text-zinc-400">{activeVisitors} live</span>
+          <span className="text-xs font-medium text-foreground tabular-nums">{activeVisitors}</span>
+          <span className="text-xs text-muted">live now</span>
         </div>
       </div>
+
 
       {/* KPI Cards */}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
