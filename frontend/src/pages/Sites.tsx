@@ -138,6 +138,23 @@ function SitesPageContent() {
     }
   }, [searchParams]);
 
+  async function fetchSiteStats(siteList: SiteData[]) {
+    // Fetch actual pageview counts for each site in the background
+    const pageviewMap: Record<string, number> = {};
+    await Promise.all(
+      siteList.map(async (site) => {
+        try {
+          const summary = await fetchSummary(site.site_id, 30);
+          pageviewMap[site.site_id] = summary?.pageviews || 0;
+          // Progressively update state so cards populate as data streams in
+          setSitePageviews(prev => ({ ...prev, [site.site_id]: summary?.pageviews || 0 }));
+        } catch {
+          setSitePageviews(prev => ({ ...prev, [site.site_id]: 0 }));
+        }
+      })
+    );
+  }
+
   async function silentLoadData() {
     try {
       const [user, siteList] = await Promise.all([getMe(), listSites()]);
@@ -145,20 +162,9 @@ function SitesPageContent() {
       setPlan(user.plan);
       setLimit(user.monthly_pageview_limit);
       setSites(siteList);
-
-      // Fetch actual pageview counts for each site
-      const pageviewMap: Record<string, number> = {};
-      await Promise.all(
-        siteList.map(async (site) => {
-          try {
-            const summary = await fetchSummary(site.site_id, 30);
-            pageviewMap[site.site_id] = summary?.pageviews || 0;
-          } catch {
-            pageviewMap[site.site_id] = 0;
-          }
-        })
-      );
-      setSitePageviews(pageviewMap);
+      
+      // Fire and forget stats fetching
+      fetchSiteStats(siteList);
     } catch {
       // Don't redirect to login on silent poll failure to prevent aggressive logouts on flaky connections
     }
@@ -167,10 +173,19 @@ function SitesPageContent() {
   async function loadData() {
     setLoading(true);
     try {
-      await silentLoadData();
+      const [user, siteList] = await Promise.all([getMe(), listSites()]);
+      setUserEmail(user.email);
+      setPlan(user.plan);
+      setLimit(user.monthly_pageview_limit);
+      setSites(siteList);
+      
+      // UI is ready, dismiss loader
+      setLoading(false);
+      
+      // Fetch heavy analytics data non-blockingly
+      fetchSiteStats(siteList);
     } catch {
       navigate("/login");
-    } finally {
       setLoading(false);
     }
   }

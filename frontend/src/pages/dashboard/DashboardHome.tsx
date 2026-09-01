@@ -55,33 +55,25 @@ export default function DashboardHome() {
   }, [siteId]);
 
   async function silentLoadData() {
-    try {
-      const [sumData, tsData, pgData, refData, devData, activeData, customData] =
-        await Promise.all([
-          fetchSummary(siteId as string, days).catch(() => null),
-          fetchTimeseries(siteId as string, days).catch(() => []),
-          fetchPages(siteId as string, days).catch(() => []),
-          fetchReferrers(siteId as string, days).catch(() => []),
-          fetchDevices(siteId as string, days).catch(() => []),
-          fetchActiveUsers(siteId as string).catch(() => null),
-          fetchCustomEvents(siteId as string, days).catch(() => []),
-        ]);
-
-      if (sumData) setSummary(sumData);
-      if (tsData) setTimeseries(tsData);
-      if (pgData) setPages(pgData);
-      if (refData) setReferrers(refData);
-      if (devData) setDevices(devData);
-      if (customData) setCustomEvents(customData);
-      setActiveVisitors(activeData?.active_visitors || 0);
-    } catch (err) {
-      console.error("Dashboard silent poll error", err);
-    }
+    // Fire and forget individual queries to populate the UI progressively
+    fetchSummary(siteId as string, days).then(d => d && setSummary(d)).catch(() => {});
+    fetchTimeseries(siteId as string, days).then(d => d && setTimeseries(d)).catch(() => {});
+    fetchPages(siteId as string, days).then(d => d && setPages(d)).catch(() => {});
+    fetchReferrers(siteId as string, days).then(d => d && setReferrers(d)).catch(() => {});
+    fetchDevices(siteId as string, days).then(d => d && setDevices(d)).catch(() => {});
+    fetchCustomEvents(siteId as string, days).then(d => d && setCustomEvents(d)).catch(() => {});
+    fetchActiveUsers(siteId as string).then(d => d && setActiveVisitors(d.active_visitors)).catch(() => {});
   }
 
   async function loadData() {
     setLoading(true);
-    await silentLoadData();
+    // Give the UI a tiny tick to paint the skeleton/loader
+    await new Promise(r => setTimeout(r, 50));
+    
+    // Kick off progressive loading
+    silentLoadData();
+    
+    // Immediately drop the hard-blocking full screen loader
     setLoading(false);
   }
 
