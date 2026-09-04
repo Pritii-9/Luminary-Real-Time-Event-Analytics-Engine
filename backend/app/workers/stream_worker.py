@@ -211,7 +211,7 @@ def run():
                 consumername=CONSUMER_NAME,
                 streams={STREAM_KEY: ">"},
                 count=BATCH_SIZE,
-                block=2000,
+                block=100,
             )
 
             if response:

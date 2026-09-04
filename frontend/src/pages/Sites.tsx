@@ -1,16 +1,18 @@
+"use client";
+
 import { useEffect, useState, Suspense, useMemo } from "react";
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   listSites,
   createSite,
   deleteSite,
   getMe,
   logout,
-  getToken, type SiteData,
+  getToken,
+  SiteData,
   createCheckoutSession,
   createPortalSession,
   fetchSummary,
-  apiFetch,
 } from "@/lib/api";
 import CustomSelect from "@/components/CustomSelect";
 import {
@@ -24,11 +26,6 @@ import {
   Copy,
   Check,
   Trash2,
-  Star,
-  Zap,
-  Settings,
-  Activity,
-  Edit3,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
@@ -37,7 +34,7 @@ import Logo from "@/components/Logo";
 import UserDropdown from "@/components/UserDropdown";
 import AccountSettingsModal from "@/components/AccountSettingsModal";
 
-export default function Sites() {
+export default function SitesPage() {
   return (
     <Suspense
       fallback={
@@ -52,7 +49,7 @@ export default function Sites() {
 }
 
 function SitesPageContent() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [sites, setSites] = useState<SiteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
@@ -76,16 +73,6 @@ function SitesPageContent() {
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [activeMenuSiteId, setActiveMenuSiteId] = useState<string | null>(null);
   const [copiedSiteId, setCopiedSiteId] = useState<string | null>(null);
-  const [pinnedSites, setPinnedSites] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("luminary_pinned") || "[]")); }
-    catch { return new Set(); }
-  });
-  const [healthCheck, setHealthCheck] = useState<Record<string, "idle" | "checking" | "ok" | "fail">>({});
-
-  // Edit Domain
-  const [editDomainSite, setEditDomainSite] = useState<SiteData | null>(null);
-  const [editDomainValue, setEditDomainValue] = useState("");
-  const [savingDomain, setSavingDomain] = useState(false);
 
   // Delete site state
   const [siteToDelete, setSiteToDelete] = useState<SiteData | null>(null);
@@ -109,17 +96,14 @@ function SitesPageContent() {
     }
   }
 
-  const [searchParams] = useSearchParams();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (!getToken()) {
+      router.push("/login");
+      return;
+    }
     loadData();
-
-    // Silent background polling every 30s
-    const pollInterval = setInterval(() => {
-      silentLoadData();
-    }, 30000);
-
-    return () => clearInterval(pollInterval);
   }, []);
 
   useEffect(() => {
@@ -128,64 +112,40 @@ function SitesPageContent() {
     if (upgrade === "success") {
       setToast({ message: `Upgraded to ${searchParams.get("plan")}. Welcome aboard.`, type: "success" });
       loadData();
-      navigate("/sites");
+      router.replace("/sites");
     } else if (upgrade === "cancel") {
       setToast({ message: "Upgrade cancelled.", type: "error" });
-      navigate("/sites");
+      router.replace("/sites");
     } else if (portal === "mock") {
       setToast({ message: "Billing portal simulated.", type: "success" });
-      navigate("/sites");
+      router.replace("/sites");
     }
   }, [searchParams]);
 
-  async function fetchSiteStats(siteList: SiteData[]) {
-    // Fetch actual pageview counts for each site in the background
-    const pageviewMap: Record<string, number> = {};
-    await Promise.all(
-      siteList.map(async (site) => {
-        try {
-          const summary = await fetchSummary(site.site_id, 30);
-          pageviewMap[site.site_id] = summary?.pageviews || 0;
-          // Progressively update state so cards populate as data streams in
-          setSitePageviews(prev => ({ ...prev, [site.site_id]: summary?.pageviews || 0 }));
-        } catch {
-          setSitePageviews(prev => ({ ...prev, [site.site_id]: 0 }));
-        }
-      })
-    );
-  }
-
-  async function silentLoadData() {
-    try {
-      const [user, siteList] = await Promise.all([getMe(), listSites()]);
-      setUserEmail(user.email);
-      setPlan(user.plan);
-      setLimit(user.monthly_pageview_limit);
-      setSites(siteList);
-      
-      // Fire and forget stats fetching
-      fetchSiteStats(siteList);
-    } catch {
-      // Don't redirect to login on silent poll failure to prevent aggressive logouts on flaky connections
-    }
-  }
-
   async function loadData() {
-    setLoading(true);
     try {
       const [user, siteList] = await Promise.all([getMe(), listSites()]);
       setUserEmail(user.email);
       setPlan(user.plan);
       setLimit(user.monthly_pageview_limit);
       setSites(siteList);
-      
-      // UI is ready, dismiss loader
-      setLoading(false);
-      
-      // Fetch heavy analytics data non-blockingly
-      fetchSiteStats(siteList);
+
+      // Fetch actual pageview counts for each site
+      const pageviewMap: Record<string, number> = {};
+      await Promise.all(
+        siteList.map(async (site) => {
+          try {
+            const summary = await fetchSummary(site.site_id, 30);
+            pageviewMap[site.site_id] = summary?.pageviews || 0;
+          } catch {
+            pageviewMap[site.site_id] = 0;
+          }
+        })
+      );
+      setSitePageviews(pageviewMap);
     } catch {
-      navigate("/login");
+      router.push("/login");
+    } finally {
       setLoading(false);
     }
   }
@@ -212,18 +172,10 @@ function SitesPageContent() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (siteName.trim().length < 3) {
-      setToast({ message: "Site name must be at least 3 characters.", type: "error" });
-      return;
-    }
-    const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!domainRegex.test(siteDomain.trim())) {
-      setToast({ message: "Please enter a valid domain (e.g., example.com)", type: "error" });
-      return;
-    }
     setCreating(true);
+    const cleanedDomain = siteDomain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
     try {
-      const site = await createSite(siteName.trim(), siteDomain.trim().toLowerCase());
+      const site = await createSite(siteName, cleanedDomain || siteDomain.trim());
       setSites((prev) => [...prev, site]);
       setShowModal(false);
       setSiteName("");
@@ -245,35 +197,7 @@ function SitesPageContent() {
     setActiveMenuSiteId(null);
   };
 
-  const togglePin = (e: React.MouseEvent, siteId: string) => {
-    e.stopPropagation();
-    setPinnedSites(prev => {
-      const next = new Set(prev);
-      if (next.has(siteId)) { next.delete(siteId); } else { next.add(siteId); }
-      localStorage.setItem("luminary_pinned", JSON.stringify([...next]));
-      return next;
-    });
-  };
-
-  const runHealthCheck = async (e: React.MouseEvent, site: SiteData) => {
-    e.stopPropagation();
-    setHealthCheck(prev => ({ ...prev, [site.site_id]: "checking" }));
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/collect`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_token: site.public_token, event_type: "health_check", url: `https://${site.domain}`, path: "/health" }),
-      });
-      setHealthCheck(prev => ({ ...prev, [site.site_id]: res.ok ? "ok" : "fail" }));
-      setToast({ message: res.ok ? `Health check passed for ${site.name}` : `Health check failed for ${site.name}`, type: res.ok ? "success" : "error" });
-    } catch {
-      setHealthCheck(prev => ({ ...prev, [site.site_id]: "fail" }));
-      setToast({ message: "Health check failed — server unreachable", type: "error" });
-    }
-    setTimeout(() => setHealthCheck(prev => ({ ...prev, [site.site_id]: "idle" })), 4000);
-  };
-
-  // Filter & Sort sites (pinned first)
+  // Filter & Sort sites
   const filteredSites = useMemo(() => {
     return sites
       .filter((s) => {
@@ -286,44 +210,12 @@ function SitesPageContent() {
         );
       })
       .sort((a, b) => {
-        const aPinned = pinnedSites.has(a.site_id) ? -1 : 1;
-        const bPinned = pinnedSites.has(b.site_id) ? -1 : 1;
-        if (aPinned !== bPinned) return aPinned - bPinned;
-        if (sortBy === "name") return a.name.localeCompare(b.name);
+        if (sortBy === "name") {
+          return a.name.localeCompare(b.name);
+        }
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }, [sites, searchQuery, sortBy, pinnedSites]);
-
-  const totalPageviews = Object.values(sitePageviews).reduce((a, c) => a + c, 0);
-
-  async function handleSaveDomain(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editDomainSite) return;
-    
-    const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!domainRegex.test(editDomainValue.trim())) {
-      setToast({ message: "Please enter a valid domain (e.g., example.com)", type: "error" });
-      return;
-    }
-
-    setSavingDomain(true);
-    try {
-      const cleanedDomain = editDomainValue.trim().toLowerCase();
-      await apiFetch(`/api/v1/sites/${editDomainSite.site_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ domain: cleanedDomain }),
-      });
-      setSites((prev) => prev.map((s) =>
-        s.site_id === editDomainSite.site_id ? { ...s, domain: cleanedDomain } : s
-      ));
-      setToast({ message: "Domain updated successfully.", type: "success" });
-      setEditDomainSite(null);
-    } catch (err: any) {
-      setToast({ message: err.message || "Failed to update domain.", type: "error" });
-    } finally {
-      setSavingDomain(false);
-    }
-  }
+  }, [sites, searchQuery, sortBy]);
 
   if (loading) {
     return (
@@ -339,18 +231,22 @@ function SitesPageContent() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
       {/* 1. TOP NAVIGATION / HEADER (Sticky, Glassmorphic, Theme-Aware) */}
-      <header className="sticky top-0 z-40 h-16 w-full border-b border-card-border bg-background/80 backdrop-blur-md px-4 md:px-8 flex items-center justify-between">
-        {/* Left: Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm">
+      <header className="sticky top-0 z-40 h-14 w-full border-b border-card-border bg-background/80 backdrop-blur-md px-4 md:px-8 flex items-center justify-between">
+        {/* Left: Logo & Workspace Title Switcher */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2.5 group cursor-pointer"
+            onClick={() => router.push("/sites")}
+            className="flex items-center gap-2.5 group text-left cursor-pointer"
           >
-            <Logo className="h-8 w-8 rounded-xl" />
-            <span className="text-foreground font-bold text-[15px] tracking-tight group-hover:text-accent transition-colors">Luminary</span>
+            <div className="h-7 w-7 rounded-lg bg-card border border-card-border flex items-center justify-center group-hover:border-accent/40 transition-colors">
+              <Logo className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
+              <span className="text-foreground font-semibold text-sm">Luminary</span>
+              <span>/</span>
+              <span className="text-foreground/80">Overview</span>
+            </div>
           </button>
-          <span className="text-muted/40 text-base">/</span>
-          <span className="text-muted font-medium text-sm">Overview</span>
         </div>
 
         {/* Right: Actions Group */}
@@ -392,56 +288,8 @@ function SitesPageContent() {
 
       {/* MAIN CONTAINER */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 py-8">
-        {/* 2. GLOBAL STATS BANNER */}
-        <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Total Sites", value: sites.length, icon: <Globe className="h-4 w-4 text-muted" /> },
-            { label: "Total Pageviews (30d)", value: totalPageviews.toLocaleString(), icon: <Activity className="h-4 w-4 text-muted" /> },
-            { label: "Pinned Sites", value: pinnedSites.size, icon: <Star className="h-4 w-4 text-muted" /> },
-            { label: "Plan", value: plan.charAt(0).toUpperCase() + plan.slice(1), icon: <Zap className="h-4 w-4 text-muted" /> },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-card-border bg-card p-5 flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-background border border-card-border flex items-center justify-center shrink-0">
-                {stat.icon}
-              </div>
-              <div>
-                <div className="text-xl font-bold text-foreground tabular-nums">{stat.value}</div>
-                <div className="text-[10px] text-muted">{stat.label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Monthly quota usage bar */}
-        {limit > 0 && (
-          <div className="mb-6 rounded-xl border border-card-border bg-card p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-foreground">Monthly Pageview Quota</span>
-              <span className="text-xs text-muted tabular-nums">
-                {totalPageviews.toLocaleString()} / {limit.toLocaleString()}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-background overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${
-                  totalPageviews / limit > 0.9
-                    ? "bg-danger"
-                    : totalPageviews / limit > 0.7
-                    ? "bg-amber-500"
-                    : "bg-success"
-                }`}
-                style={{ width: `${Math.min((totalPageviews / limit) * 100, 100)}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-muted mt-1.5">
-              {((totalPageviews / limit) * 100).toFixed(1)}% used ·{" "}
-              {Math.max(limit - totalPageviews, 0).toLocaleString()} remaining
-            </p>
-          </div>
-        )}
-
-        {/* 3. PAGE HEADER & TOOLBAR */}
-        <div className="mb-6 flex items-center justify-between gap-4">
+        {/* 2. PAGE HEADER & TOOLBAR */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Your Sites</h1>
             <p className="text-xs text-muted mt-1">
@@ -459,7 +307,7 @@ function SitesPageContent() {
                 placeholder="Filter sites..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 rounded-md border border-card-border bg-card px-3 pl-9 text-xs text-foreground placeholder:text-muted/70 focus:border-accent focus:outline-none transition-colors"
+                className="w-full h-9 rounded-md border border-card-border bg-card px-3 pl-9 text-xs text-foreground placeholder:text-muted focus:border-accent focus:outline-none transition-colors"
               />
             </div>
 
@@ -504,11 +352,11 @@ function SitesPageContent() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredSites.map((site) => (
               <div
                 key={site.id}
-                onClick={() => navigate(`/dashboard/${site.site_id}`)}
+                onClick={() => router.push(`/dashboard/${site.site_id}`)}
                 className="group relative rounded-xl border border-card-border bg-card p-5 hover:border-accent/40 hover:bg-white/[0.02] transition-all cursor-pointer flex flex-col justify-between"
               >
                 {/* CARD TOP SECTION */}
@@ -522,14 +370,9 @@ function SitesPageContent() {
 
                       {/* Title & External Link */}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          {pinnedSites.has(site.site_id) && (
-                            <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />
-                          )}
-                          <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-accent transition-colors">
-                            {site.name}
-                          </h3>
-                        </div>
+                        <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-accent transition-colors">
+                          {site.name}
+                        </h3>
                         <a
                           href={`https://${site.domain}`}
                           target="_blank"
@@ -543,97 +386,76 @@ function SitesPageContent() {
                       </div>
                     </div>
 
-                    {/* Right: Pin + Menu */}
-                    <div className="flex items-center gap-1 shrink-0">
+                    {/* Context Action Menu */}
+                    <div className="relative">
                       <button
                         type="button"
-                        onClick={(e) => togglePin(e, site.site_id)}
-                        title={pinnedSites.has(site.site_id) ? "Unpin site" : "Pin site"}
-                        className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
-                          pinnedSites.has(site.site_id)
-                            ? "text-amber-400 hover:text-amber-300"
-                            : "text-muted hover:text-foreground hover:bg-white/5"
-                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuSiteId(activeMenuSiteId === site.site_id ? null : site.site_id);
+                        }}
+                        className="h-7 w-7 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
                       >
-                        <Star className={`h-3.5 w-3.5 ${pinnedSites.has(site.site_id) ? "fill-amber-400" : ""}`} />
+                        <MoreVertical className="h-4 w-4" />
                       </button>
 
-                      {/* Context Action Menu */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuSiteId(activeMenuSiteId === site.site_id ? null : site.site_id);
-                          }}
-                          className="h-7 w-7 rounded-md flex items-center justify-center text-muted hover:text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+                      {activeMenuSiteId === site.site_id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 mt-1 w-44 rounded-lg border border-card-border bg-card p-1 shadow-xl z-30 animate-fade-in text-xs"
                         >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {activeMenuSiteId === site.site_id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 mt-1 w-48 rounded-lg border border-card-border bg-card p-1 shadow-xl z-30 animate-fade-in text-xs"
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopySiteId(e, site.site_id)}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
                           >
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopySiteId(e, site.site_id)}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
-                            >
-                              {copiedSiteId === site.site_id ? (
-                                <Check className="h-3.5 w-3.5 text-success" />
-                              ) : (
-                                <Copy className="h-3.5 w-3.5 text-muted" />
-                              )}
-                              <span>Copy Site ID</span>
-                            </button>
+                            {copiedSiteId === site.site_id ? (
+                              <Check className="h-3.5 w-3.5 text-success" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5 text-muted" />
+                            )}
+                            <span>Copy Site ID</span>
+                          </button>
 
-                            <button
-                              type="button"
-                              onClick={() => { setActiveMenuSiteId(null); navigate(`/dashboard/${site.site_id}/snippet`); }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
-                            >
-                              <Code className="h-3.5 w-3.5 text-muted" />
-                              <span>View Snippet</span>
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              router.push(`/dashboard/${site.site_id}/snippet`);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
+                          >
+                            <Code className="h-3.5 w-3.5 text-muted" />
+                            <span>View Snippet</span>
+                          </button>
 
-                            <button
-                              type="button"
-                              onClick={() => { setActiveMenuSiteId(null); navigate(`/dashboard/${site.site_id}`); }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
-                            >
-                              <BarChart3 className="h-3.5 w-3.5 text-muted" />
-                              <span>Open Dashboard</span>
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              router.push(`/dashboard/${site.site_id}`);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
+                          >
+                            <BarChart3 className="h-3.5 w-3.5 text-muted" />
+                            <span>Open Dashboard</span>
+                          </button>
 
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuSiteId(null);
-                                setEditDomainSite(site);
-                                setEditDomainValue(site.domain);
-                              }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-foreground hover:bg-white/5 text-left transition-colors"
-                            >
-                              <Edit3 className="h-3.5 w-3.5 text-muted" />
-                              <span>Edit Domain</span>
-                            </button>
+                          <div className="my-1 border-t border-border-subtle" />
 
-                            <div className="my-1 border-t border-border-subtle" />
-
-                            <button
-                              type="button"
-                              onClick={() => { setActiveMenuSiteId(null); setSiteToDelete(site); }}
-                              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-danger hover:bg-danger/10 text-left transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-danger" />
-                              <span>Delete Site</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuSiteId(null);
+                              setSiteToDelete(site);
+                            }}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-danger hover:bg-danger/10 text-left transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-danger" />
+                            <span>Delete Site</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -673,12 +495,12 @@ function SitesPageContent() {
                   </div>
                 </div>
 
-                {/* CARD BOTTOM SECTION */}
+                {/* CARD BOTTOM SECTION: SITE ID + ACTIONS */}
                 <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-2 mt-1">
                   {/* Site ID */}
                   <div
                     onClick={(e) => handleCopySiteId(e, site.site_id)}
-                    className="font-mono text-xs text-muted hover:text-foreground transition-colors truncate max-w-[120px] cursor-pointer"
+                    className="font-mono text-[11px] text-muted hover:text-foreground transition-colors truncate max-w-[110px]"
                     title="Click to copy Site ID"
                   >
                     {site.site_id}
@@ -686,85 +508,33 @@ function SitesPageContent() {
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-1.5">
-                    {/* Health Check */}
                     <button
                       type="button"
-                      onClick={(e) => runHealthCheck(e, site)}
-                      title="Run health check"
-                      className={`inline-flex items-center gap-1 h-9 rounded-md border px-2.5 text-xs font-medium transition-colors cursor-pointer ${
-                        healthCheck[site.site_id] === "ok"
-                          ? "border-success/40 bg-success/10 text-success"
-                          : healthCheck[site.site_id] === "fail"
-                          ? "border-danger/40 bg-danger/10 text-danger"
-                          : "border-card-border bg-card text-muted hover:text-foreground hover:bg-white/5"
-                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/${site.site_id}/snippet`);
+                      }}
+                      className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-card px-2.5 text-xs font-medium text-muted hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <Zap className={`h-3 w-3 ${healthCheck[site.site_id] === "checking" ? "animate-pulse" : ""}`} />
-                    </button>
-
-                    {/* Snippet */}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/${site.site_id}/snippet`); }}
-                      className="inline-flex items-center gap-1.5 h-9 rounded-md border border-card-border bg-card px-3 text-xs font-medium text-muted hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <Code className="h-3.5 w-3.5" />
+                      <Code className="h-3 w-3" />
                       <span>Snippet</span>
                     </button>
 
-                    {/* Dashboard */}
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/${site.site_id}`); }}
-                      className="inline-flex items-center gap-1.5 h-9 rounded-md border border-card-border bg-card px-3 text-xs font-medium text-foreground hover:bg-white/10 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/dashboard/${site.site_id}`);
+                      }}
+                      className="inline-flex items-center gap-1.5 h-7 rounded-md border border-card-border bg-card px-2.5 text-xs font-medium text-foreground hover:bg-white/10 transition-colors cursor-pointer"
                     >
-                      <BarChart3 className="h-3.5 w-3.5 text-muted" />
+                      <BarChart3 className="h-3 w-3 text-muted" />
                       <span>Dashboard</span>
                     </button>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* MODAL: EDIT DOMAIN */}
-        {editDomainSite && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
-            <div className="w-full max-w-sm rounded-xl border border-card-border bg-card p-6 shadow-2xl">
-              <h2 className="text-base font-semibold text-foreground mb-1">Edit Domain</h2>
-              <p className="text-xs text-muted mb-4">
-                Update the tracked domain for <span className="text-foreground font-medium">{editDomainSite.name}</span>.
-              </p>
-              <form onSubmit={handleSaveDomain} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">Domain Name</label>
-                  <input
-                    required
-                    value={editDomainValue}
-                    onChange={(e) => setEditDomainValue(e.target.value)}
-                    className="w-full h-9 rounded-md border border-card-border bg-background px-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
-                    placeholder="e.g. acme.com"
-                  />
-                </div>
-                <div className="flex gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setEditDomainSite(null)}
-                    className="flex-1 h-9 rounded-md border border-card-border bg-transparent text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingDomain}
-                    className="flex-1 h-9 rounded-md bg-foreground text-xs font-semibold text-background hover:opacity-90 disabled:opacity-40 cursor-pointer transition-opacity"
-                  >
-                    {savingDomain ? "Saving..." : "Save Domain"}
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
 
@@ -943,7 +713,7 @@ function SitesPageContent() {
           onConfirm={async () => {
             setShowConfirmLogout(false);
             await logout();
-            navigate("/login");
+            router.push("/login");
           }}
           onCancel={() => setShowConfirmLogout(false)}
         />
