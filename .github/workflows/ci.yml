@@ -39,6 +39,7 @@ jobs:
 
       - name: Run Backend Tests
         env:
+          PYTHONPATH: backend
           APP_ENV: test
           JWT_SECRET: ci-test-secret
           DATABASE_URL: ""
