@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   listSites,
   createSite,
@@ -9,7 +9,7 @@ import {
   getMe,
   logout,
   getToken,
-  SiteData,
+  type SiteData,
   createCheckoutSession,
   createPortalSession,
   fetchSummary,
@@ -49,7 +49,8 @@ export default function SitesPage() {
 }
 
 function SitesPageContent() {
-  const router = useRouter();
+  const navigate = useNavigate();
+  const router = useMemo(() => ({ push: (path: string) => navigate(path), replace: (path: string) => navigate(path, { replace: true }) }), [navigate]);
   const [sites, setSites] = useState<SiteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
@@ -96,7 +97,7 @@ function SitesPageContent() {
     }
   }
 
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (!getToken()) {

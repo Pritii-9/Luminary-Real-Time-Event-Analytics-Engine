@@ -3,8 +3,8 @@
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-luminary--web--event--engine.vercel.app-blueviolet?style=for-the-badge&logo=vercel)](https://luminary-web-event-engine.vercel.app)
 [![Backend Status](https://img.shields.io/badge/Backend-Render-000000?style=for-the-badge&logo=render)](https://luminary-scalable-web-event-engine.onrender.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![ClickHouse](https://img.shields.io/badge/ClickHouse-FFCC00?style=for-the-badge&logo=clickhouse&logoColor=black)](https://clickhouse.com/)
@@ -36,7 +36,7 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 | Feature | Description |
 |---|---|
 | ⚡ **High-Throughput Event Ingestion** | Asynchronous `/api/v1/collect` endpoint built with FastAPI and Redis Streams for zero-latency event buffering. |
-| 📊 **Real-Time Analytics Dashboard** | Interactive Next.js dashboard displaying live pageviews, unique visitors, active sessions, top pages, referrers, and geolocation breakdown. |
+| 📊 **Real-Time Analytics Dashboard** | Interactive React 19 dashboard displaying live pageviews, unique visitors, active sessions, top pages, referrers, and geolocation breakdown. |
 | 🎯 **Custom Event & Goal Tracking** | Capture custom user interactions, conversion milestones, and key business events effortlessly. |
 | 🔄 **Session Telemetry & Replays** | Track visitor journeys, entry/exit pages, referral sources, user agents, and session duration distributions. |
 | 🚀 **ClickHouse Columnar Storage** | High-performance analytical querying via ClickHouse with seamless SQLite / PostgreSQL fallbacks. |
@@ -52,7 +52,7 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 ```
                                   ┌─────────────────────────────────────────┐
                                   │            Vercel (Frontend)            │
-                                  │       Next.js 14 + React + TS +         │
+                                  │       React 19 + Vite + TS +            │
                                   │      Tailwind CSS + Recharts + Lucide   │
                                   └────────────────────┬────────────────────┘
                                                        │  HTTPS / REST / Auth
@@ -93,7 +93,7 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 - **Billing Integration:** [Stripe API](https://stripe.com/)
 
 ### Frontend
-- **Framework:** [Next.js 14](https://nextjs.org/) (App Router) + [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Framework:** [React 19](https://react.dev/) + [Vite](https://vitejs.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) + Dark/Light Theme System
 - **Visualization:** [Recharts](https://recharts.org/)
 - **Icons & UI:** Lucide React, Custom Selects, Glassmorphic Design Tokens
