@@ -99,9 +99,48 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 - **Icons & UI:** Lucide React, Custom Selects, Glassmorphic Design Tokens
 
 ### DevOps & Infrastructure
-- **Containers:** Docker & Docker Compose
+- **Containers:** Docker & Docker Compose (Non-root `appuser` container execution)
 - **Hosting:** Render.com (Backend API & Worker), Vercel (Frontend Dashboard)
 - **Database Hosting:** ClickHouse Cloud / Local Docker, Managed PostgreSQL
+- **CI/CD & SAST:** GitHub Actions Matrix Builds, CodeQL SAST Analysis, Aqua Security Trivy Container Scans, Dependabot
+
+---
+
+## 🛡️ DevSecOps & Security Architecture
+
+Luminary incorporates enterprise-grade DevSecOps automation, multi-version matrix testing, non-root container isolation, and automated static/container vulnerability scanning:
+
+```mermaid
+graph TD
+    subgraph CI/CD & Security Architecture
+        Commit["Git Push / PR"] --> CI["GitHub Actions DAG Pipeline"]
+        
+        subgraph Stage 1: Compatibility Matrix & SAST
+            CI --> MatrixPy["Python Matrix Test (3.11 & 3.12)"]
+            CI --> MatrixNode["Node.js Matrix Build (20 & 22)"]
+            CI --> CodeQL["CodeQL SAST Scan (Python & TypeScript)"]
+        end
+        
+        subgraph Stage 2: Container Security
+            MatrixPy & MatrixNode --> DockerBuild["Docker Build (Unprivileged appuser UID 1000)"]
+            DockerBuild --> Trivy["Aqua Security Trivy Scan (OS & Library CVEs)"]
+        end
+        
+        subgraph Stage 3: Maintenance & Release
+            Dependabot["Dependabot (Weekly Dependency Audits)"]
+            Trivy & CodeQL --> Production["Production Deploy (Render & Vercel)"]
+        end
+    end
+```
+
+| Security Pillar | Implementation | Focus Area |
+|---|---|---|
+| 🔍 **SAST (Static Analysis)** | GitHub CodeQL (`codeql.yml`) | Scans Python backend & TypeScript/React code for security vulnerabilities, SQL injection, and weak crypto. |
+| 🛡️ **Container Scanning** | Aqua Security Trivy Action (`ci.yml`) | Inspects Docker image layers (`python:3.11-slim`) for OS-level CVE binaries and unpatched Linux packages. |
+| 📦 **SCA (Dependency Audit)** | GitHub Dependabot (`dependabot.yml`) | Automated weekly scanning for outdated PyPI packages, npm packages, and GitHub Actions dependencies. |
+| 🔀 **Matrix Compatibility** | GitHub Actions Matrix Strategy | Multi-version cross-platform validation across Python (3.11, 3.12) and Node.js (20, 22). |
+| 🔒 **Least Privilege Execution** | Docker Non-Root Hardening (`Dockerfile`) | Backend application executes as an unprivileged user (`appuser` UID 1000) to mitigate container breakout risks. |
+| ⚡ **Strict Gating** | Zero-Fallback Exit Code Gates | Pipeline fails builds immediately on linting, testing, or vulnerability threshold failures. |
 
 ---
 
