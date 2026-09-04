@@ -173,8 +173,9 @@ function SitesPageContent() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
+    const cleanedDomain = siteDomain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
     try {
-      const site = await createSite(siteName, siteDomain);
+      const site = await createSite(siteName, cleanedDomain || siteDomain.trim());
       setSites((prev) => [...prev, site]);
       setShowModal(false);
       setSiteName("");
