@@ -11,7 +11,7 @@ PyJWT>=2.13.0
 sqlmodel>=0.0.39
 SQLAlchemy>=2.0.50
 python-multipart>=0.0.32
-ua-parser>=1.0.0
+ua-parser>=1.0.2
 # Optional: GeoIP enrichment
 # maxminddb>=2.4.0
 psycopg2-binary>=2.9.9
