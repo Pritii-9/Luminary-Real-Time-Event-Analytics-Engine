@@ -60,7 +60,7 @@ def analyze_threat_with_llm(req: LLMAnalysisRequest):
     return report
 
 @router.post("/nl-query")
-def query_telemetry_with_nl(req: NLQueryRequest):
+def query_telemetry_with_nl(req: NLQueryRequest, session: Session = Depends(get_session)):
     """Translates user natural language query into telemetry insights via LLM Agent."""
-    result = process_natural_language_analytics_query(req.query, req.site_id)
+    result = process_natural_language_analytics_query(req.query, req.site_id, session=session)
     return result

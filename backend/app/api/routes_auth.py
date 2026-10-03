@@ -2,7 +2,8 @@
 
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func
 from sqlmodel import Session as SQLSession, select
 
 from app.core.auth import (
@@ -20,10 +21,6 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _otp_memory_store = {}
 
-
-
-from pydantic import BaseModel, Field
-
 EMAIL_REGEX = r"^[^@]+@[^@]+\.[^@]+$"
 
 class RegisterRequest(BaseModel):
@@ -32,19 +29,39 @@ class RegisterRequest(BaseModel):
     full_name: str | None = Field(default=None, max_length=255)
     company_name: str | None = Field(default=None, max_length=255)
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
 
 class LoginRequest(BaseModel):
     email: str = Field(..., pattern=EMAIL_REGEX)
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class VerifyOTPRequest(BaseModel):
     email: str = Field(..., pattern=EMAIL_REGEX)
     otp: str
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
 
 class ResendOTPRequest(BaseModel):
     email: str = Field(..., pattern=EMAIL_REGEX)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class UserResponse(BaseModel):
@@ -77,31 +94,21 @@ async def register(body: RegisterRequest, request: Request, response: Response, 
     if not body.password or len(body.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
 
-    existing = session.exec(select(User).where(User.email == body.email)).first()
+    existing = session.exec(select(User).where(func.lower(User.email) == body.email)).first()
     if existing:
-        if existing.is_verified:
-            raise HTTPException(status_code=409, detail="Email already registered")
-        # Existing but unverified: update password in case they changed it
-        existing.password_hash = hash_password(body.password)
-        existing.full_name = body.full_name.strip() if body.full_name else None
-        existing.company_name = body.company_name.strip() if body.company_name else None
-        existing.is_verified = True
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        user = existing
-    else:
-        # Create auto-verified user to bypass OTP
-        user = User(
-            email=body.email,
-            password_hash=hash_password(body.password),
-            full_name=body.full_name.strip() if body.full_name else None,
-            company_name=body.company_name.strip() if body.company_name else None,
-            is_verified=True,
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        raise HTTPException(status_code=409, detail="Email already registered. Please log in.")
+
+    # Create auto-verified user to bypass OTP
+    user = User(
+        email=body.email,
+        password_hash=hash_password(body.password),
+        full_name=body.full_name.strip() if body.full_name else None,
+        company_name=body.company_name.strip() if body.company_name else None,
+        is_verified=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
 
     # Generate access token
     token = create_access_token(user.id, user.email)
@@ -138,7 +145,7 @@ async def verify_otp(body: VerifyOTPRequest, request: Request, response: Respons
     if await is_rate_limited(request, "auth_verify_otp", limit=10, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many verification attempts. Please try again later.")
 
-    user = session.exec(select(User).where(User.email == body.email)).first()
+    user = session.exec(select(User).where(func.lower(User.email) == body.email)).first()
     # Do not reveal whether the user exists to prevent user enumeration. If the
     # user is not found, continue to OTP checks so the response is the same as
     # for an invalid/expired OTP.
@@ -215,7 +222,7 @@ async def resend_otp(body: ResendOTPRequest, request: Request, background_tasks:
     if await is_rate_limited(request, "auth_resend_otp", limit=3, window_seconds=300):
         raise HTTPException(status_code=429, detail="Too many resend attempts. Please try again later.")
 
-    user = session.exec(select(User).where(User.email == body.email)).first()
+    user = session.exec(select(User).where(func.lower(User.email) == body.email)).first()
     # Do not reveal whether the user exists or whether the email is already
     # verified to prevent user enumeration. If the user does not exist or is
     # already verified, pretend a resend succeeded.
@@ -243,10 +250,12 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
     if await is_rate_limited(request, "auth_login", limit=10, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
 
-    user = session.exec(select(User).where(User.email == body.email)).first()
-    if not user or not verify_password(body.password, user.password_hash):
-        # Generic error to avoid user enumeration
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    user = session.exec(select(User).where(func.lower(User.email) == body.email)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="No account found with this email. Please check your email or sign up.")
+
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect password. Please try again.")
 
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Email verification required")

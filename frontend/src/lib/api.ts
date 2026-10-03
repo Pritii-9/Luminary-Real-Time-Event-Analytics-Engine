@@ -56,7 +56,8 @@ export async function apiFetch<T = unknown>(
     if (typeof window !== "undefined" && window.location.pathname !== "/login") {
       window.location.href = "/login";
     }
-    throw new Error("Unauthorized");
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Unauthorized");
   }
 
   if (!res.ok) {
