@@ -1,5 +1,5 @@
-import { useEffect, useState, use } from "react";
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   fetchSummary,
   fetchTimeseries,
@@ -8,13 +8,15 @@ import {
   fetchDevices,
   fetchActiveUsers,
   fetchCustomEvents,
+  fetchAnomalies,
   getToken,
+  type AnomalyData,
 } from "@/lib/api";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
-import { Eye, Users, Activity, Globe, FileText, Zap } from "lucide-react";
+import { Eye, Users, Activity, Globe, FileText, Zap, AlertTriangle, ShieldCheck, TrendingUp, TrendingDown } from "lucide-react";
 
 const CHART_COLORS = ["#a1a1aa", "#71717a", "#52525b", "#3f3f46", "#27272a", "#d4d4d8", "#e4e4e7"];
 
@@ -27,6 +29,7 @@ export default function DashboardHome() {
   const [referrers, setReferrers] = useState<any[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
   const [customEvents, setCustomEvents] = useState<any[]>([]);
+  const [anomaly, setAnomaly] = useState<AnomalyData | null>(null);
   const [activeVisitors, setActiveVisitors] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
@@ -62,6 +65,7 @@ export default function DashboardHome() {
     fetchReferrers(siteId as string, days).then(d => d && setReferrers(d)).catch(() => {});
     fetchDevices(siteId as string, days).then(d => d && setDevices(d)).catch(() => {});
     fetchCustomEvents(siteId as string, days).then(d => d && setCustomEvents(d)).catch(() => {});
+    fetchAnomalies(siteId as string, days).then(d => d && setAnomaly(d)).catch(() => {});
     fetchActiveUsers(siteId as string).then(d => d && setActiveVisitors(d.active_visitors)).catch(() => {});
   }
 
@@ -123,6 +127,47 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {/* AI Traffic Anomaly Alert Banner */}
+      {anomaly && (
+        <div
+          className={`mb-6 p-4 rounded-xl border flex items-start justify-between gap-4 transition-all ${
+            anomaly.status.startsWith("SPIKE")
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+              : anomaly.status === "DROP_OFF_WARNING"
+              ? "bg-red-500/10 border-red-500/30 text-red-200"
+              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {anomaly.status.startsWith("SPIKE") ? (
+              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            ) : anomaly.status === "DROP_OFF_WARNING" ? (
+              <TrendingDown className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <ShieldCheck className="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            )}
+
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-xs">
+                <span>AI Traffic Anomaly Status:</span>
+                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider bg-black/20">
+                  {anomaly.status.replace("_", " ")}
+                </span>
+                <span className="text-[11px] font-mono text-muted">
+                  (Z-Score: {anomaly.z_score >= 0 ? `+${anomaly.z_score}` : anomaly.z_score})
+                </span>
+              </div>
+              <p className="text-xs mt-1 text-muted-foreground">{anomaly.recommendation}</p>
+            </div>
+          </div>
+
+          <div className="text-right flex-shrink-0 text-xs font-mono hidden sm:block">
+            <p className="font-semibold">{anomaly.current_hourly_traffic} visits/hr</p>
+            <p className="text-[10px] text-muted">Mean: {anomaly.mean_hourly_traffic}/hr ({anomaly.pct_deviation})</p>
+          </div>
+        </div>
+      )}
+
 
       {/* KPI Cards */}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -167,7 +212,7 @@ export default function DashboardHome() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={devices} dataKey="views" nameKey="device_type" cx="50%" cy="50%" outerRadius={85} innerRadius={52} paddingAngle={3}>
-                    {devices.map((_, i) => (
+                    {devices.map((_: any, i: number) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="var(--card)" strokeWidth={2} />
                     ))}
                   </Pie>
@@ -188,7 +233,7 @@ export default function DashboardHome() {
           </div>
           {devices.length > 0 && (
             <div className="mt-2 flex flex-wrap justify-center gap-3">
-              {devices.map((d, i) => (
+              {devices.map((d: any, i: number) => (
                 <div key={i} className="flex items-center gap-1.5 text-xs text-muted">
                   <div className="h-2 w-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                   {d.device_type}: {d.views}
@@ -208,7 +253,7 @@ export default function DashboardHome() {
             <h2 className="text-[10px] font-medium text-muted uppercase tracking-wider">Top Pages</h2>
           </div>
           <div className="divide-y divide-border-subtle">
-            {pages.map((page, i) => (
+            {pages.map((page: any, i: number) => (
               <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
                 <span className="text-xs text-zinc-400 font-mono truncate max-w-[250px]">{page.path}</span>
                 <span className="text-xs font-medium text-muted tabular-nums">{page.views}</span>
@@ -227,7 +272,7 @@ export default function DashboardHome() {
             <h2 className="text-[10px] font-medium text-muted uppercase tracking-wider">Traffic Sources</h2>
           </div>
           <div className="divide-y divide-border-subtle">
-            {referrers.map((ref, i) => (
+            {referrers.map((ref: any, i: number) => (
               <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
                 <span className="text-xs text-zinc-400 truncate max-w-[250px]">{ref.referrer}</span>
                 <span className="text-xs font-medium text-muted tabular-nums">{ref.views}</span>
@@ -254,7 +299,7 @@ export default function DashboardHome() {
                 <span className="col-span-2 text-right">Rate</span>
               </div>
             )}
-            {customEvents.map((event, i) => {
+            {customEvents.map((event: any, i: number) => {
               const convRate = summary?.visitors
                 ? ((event.unique_visitors / summary.visitors) * 100).toFixed(1)
                 : "0.0";

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3, FileText, Globe, Zap, Code, MousePointer2,
-  Megaphone, Download, ChevronLeft, ChevronRight, ArrowLeft,
+  Megaphone, Download, ChevronLeft, ChevronRight, ArrowLeft, Filter,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -24,6 +24,7 @@ interface SidebarLayoutProps {
 
 const NAV_ITEMS = [
   { key: "overview",  label: "Overview",        icon: BarChart3,     path: "" },
+  { key: "funnels",   label: "Funnels",         icon: Filter,        path: "/funnels" },
   { key: "pages",     label: "Pages",            icon: FileText,      path: "/pages" },
   { key: "sources",   label: "Sources",          icon: Globe,         path: "/sources" },
   { key: "campaigns", label: "Campaigns",        icon: Megaphone,     path: "/campaigns" },

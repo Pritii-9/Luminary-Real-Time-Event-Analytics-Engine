@@ -79,6 +79,18 @@ class SessionReplay(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class Funnel(SQLModel, table=True):
+    __tablename__ = "funnels"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    site_id: str = Field(index=True, max_length=64)
+    name: str = Field(max_length=128)
+    steps_json: str = Field(default="[]")  # JSON list of steps: [{"name": "Step 1", "path": "/"}]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+
 # ---------------------------------------------------------------------------
 # Engine & session helpers
 # ---------------------------------------------------------------------------

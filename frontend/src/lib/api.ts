@@ -266,3 +266,71 @@ export function getRealtimeStreamUrl(siteId: string) {
 export async function fetchUtm(siteId: string, days: number = 7) {
   return apiFetch<any[]>(`/api/v1/stats/utm?site_id=${siteId}&days=${days}`);
 }
+
+// ---------------------------------------------------------------------------
+// AI Anomaly Detection & Funnels API
+// ---------------------------------------------------------------------------
+
+export interface AnomalyData {
+  status: "NORMAL" | "SPIKE_WARNING" | "SPIKE_CRITICAL" | "DROP_OFF_WARNING";
+  z_score: number;
+  current_hourly_traffic: number;
+  mean_hourly_traffic: number;
+  std_dev: number;
+  pct_deviation: string;
+  analysis_window_days: number;
+  recommendation: string;
+  hourly_trend: { hour: string; count: number }[];
+}
+
+export async function fetchAnomalies(siteId: string, days: number = 7) {
+  return apiFetch<AnomalyData>(`/api/v1/stats/anomalies?site_id=${siteId}&days=${days}`);
+}
+
+export interface FunnelItem {
+  id: number;
+  site_id: string;
+  name: string;
+  steps: { name: string; path: string }[];
+  created_at: string;
+}
+
+export interface FunnelAnalysis {
+  funnel_id: number;
+  site_id: string;
+  name: string;
+  overall_conversion_rate: string;
+  total_entrants: number;
+  total_conversions: number;
+  step_analysis: {
+    step_number: number;
+    name: string;
+    path: string;
+    visitors: number;
+    retention_rate: string;
+    dropoff_count: number;
+    dropoff_rate: string;
+  }[];
+}
+
+export async function listFunnels(siteId: string) {
+  return apiFetch<FunnelItem[]>(`/api/v1/funnels?site_id=${siteId}`);
+}
+
+export async function createFunnelApi(siteId: string, name: string, steps: { name: string; path: string }[]) {
+  return apiFetch<{ message: string; funnel_id: number }>("/api/v1/funnels", {
+    method: "POST",
+    body: JSON.stringify({ site_id: siteId, name, steps }),
+  });
+}
+
+export async function deleteFunnelApi(funnelId: number) {
+  return apiFetch<{ message: string }>(`/api/v1/funnels/${funnelId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchFunnelAnalysis(funnelId: number, days: number = 30) {
+  return apiFetch<FunnelAnalysis>(`/api/v1/funnels/${funnelId}/analysis?days=${days}`);
+}
+

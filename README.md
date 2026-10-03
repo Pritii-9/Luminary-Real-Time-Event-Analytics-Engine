@@ -7,13 +7,13 @@
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![ClickHouse](https://img.shields.io/badge/ClickHouse-FFCC00?style=for-the-badge&logo=clickhouse&logoColor=black)](https://clickhouse.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-> **High-Throughput Web Event Engine & Real-Time Analytics Platform**  
-> Luminary is a production-grade, scalable event ingestion and telemetry analytics platform built for modern web applications. It features high-throughput API collection, Redis Stream buffering, background stream consumers, ClickHouse column-store analytics, custom goal tracking, session telemetry, and multi-tenant site management.
+> **Scalable Web Telemetry Engine, AI-Powered Cyber Security & Real-Time Analytics Platform**  
+> Luminary is a production-grade, high-throughput event ingestion and telemetry analytics platform built for modern web applications. It features zero-latency Redis Stream buffering, background stream consumer workers, PostgreSQL database analytics, ML cyber threat payload scanning (SQLi, XSS, Shannon Entropy), LLM incident reasoning & WAF patch generation, Z-score traffic anomaly detection, conversion funnels, and multi-tenant management.
 
 ---
 
@@ -37,47 +37,49 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 |---|---|
 | ⚡ **High-Throughput Event Ingestion** | Asynchronous `/api/v1/collect` endpoint built with FastAPI and Redis Streams for zero-latency event buffering. |
 | 📊 **Real-Time Analytics Dashboard** | Interactive React 19 dashboard displaying live pageviews, unique visitors, active sessions, top pages, referrers, and geolocation breakdown. |
-| 🎯 **Custom Event & Goal Tracking** | Capture custom user interactions, conversion milestones, and key business events effortlessly. |
+| 🛡️ **ML Cyber Threat Detection** | Scans incoming telemetry for OWASP Top 10 exploits (SQLi, XSS, Path Traversal) and calculates Shannon Entropy obfuscation risk scores. |
+| 🤖 **LLM Security Incident Agent** | Analyzes flagged cyber threats to generate technical root cause analysis, automated WAF rules, and developer code fixes. |
+| 📈 **Statistical Anomaly Engine** | Calculates rolling moving averages and Z-scores using **NumPy** and **Pandas** to detect 3-sigma traffic spikes and bot surges. |
+| 🎯 **Conversion Funnels & Goals** | Track multi-step user conversion journeys and identify step-by-step drop-off percentages. |
+| 🗄️ **PostgreSQL Analytical Engine** | High-performance relational querying and index-optimized time-series analytics via PostgreSQL (Neon DB). |
 | 🔄 **Session Telemetry & Replays** | Track visitor journeys, entry/exit pages, referral sources, user agents, and session duration distributions. |
-| 🚀 **ClickHouse Columnar Storage** | High-performance analytical querying via ClickHouse with seamless SQLite / PostgreSQL fallbacks. |
 | 🔐 **Multi-Tenant Authentication** | Email OTP verification, JWT authentication, domain CORS protection, and secure account management. |
-| 💳 **Stripe Billing & Tier Management** | Usage tracking against tier quotas (Free, Pro, Enterprise) with Stripe portal integration. |
-| 📜 **Embeddable Tracking Snippet** | Lightweight, asynchronous JavaScript tracking snippet for 1-minute site setup. |
-| 📥 **Data Export & Reporting** | Export aggregated telemetry and raw event logs in CSV format for offline reporting. |
+| 💳 **Stripe Billing & Tier Quotas** | Usage tracking against tier quotas (Free, Pro, Enterprise) with Stripe portal integration. |
+| 🚀 **Locust Performance Benchmarking** | Built-in high-concurrency load testing suite (`scripts/load_test.py`) for empirical RPS and latency verification. |
 
 ---
 
 ## 🏗️ System Architecture
 
 ```
-                                  ┌─────────────────────────────────────────┐
-                                  │            Vercel (Frontend)            │
-                                  │       React 19 + Vite + TS +            │
-                                  │      Tailwind CSS + Recharts + Lucide   │
-                                  └────────────────────┬────────────────────┘
-                                                       │  HTTPS / REST / Auth
-                                  ┌────────────────────▼────────────────────┐
-                                  │           Render.com (Backend)          │
-                                  │  ┌───────────────────────────────────┐  │
-                                  │  │  FastAPI (Uvicorn Async API)      │  │
-                                  │  │  • JWT Auth & OTP Verification    │  │
-                                  │  │  • Ingestion /api/v1/collect      │  │
-                                  │  │  • Stats & Analytics Aggregation  │  │
-                                  │  │  • CORS & Security Middleware     │  │
-                                  │  └─────────────────┬─────────────────┘  │
-                                  │                    │ Redis Stream       │
-                                  │  ┌─────────────────▼─────────────────┐  │
-                                  │  │  Stream Worker Consumer           │  │
-                                  │  │  • User-Agent & Geo Enrichment    │  │
-                                  │  │  • Batch Telemetry Processing     │  │
-                                  │  │  • ClickHouse / SQLite Sync       │  │
-                                  │  └───────────────────────────────────┘  │
-                                  └──────┬──────────────────────┬───────────┘
-                                         │                      │
-                                  ┌──────▼──────┐        ┌──────▼──────┐
-                                  │ ClickHouse /│        │   Redis     │
-                                  │ PostgreSQL  │        │(Events Stream)
-                                  └─────────────┘        └─────────────┘
+                               ┌──────────────────────────────────────────┐
+                               │            Vercel (Frontend)             │
+                               │       React 19 + Vite + TS +             │
+                               │      Tailwind CSS + Recharts + Lucide    │
+                               └────────────────────┬─────────────────────┘
+                                                    │  HTTPS / REST / Auth
+                               ┌────────────────────▼─────────────────────┐
+                               │           Render.com (Backend)           │
+                               │  ┌────────────────────────────────────┐  │
+                               │  │  FastAPI (Uvicorn Async API)       │  │
+                               │  │  • Rate Limiting & Bot Filter      │  │
+                               │  │  • ML Threat Scan (SQLi, XSS)      │  │
+                               │  │  • LLM Security Incident Agent     │  │
+                               │  │  • Ingestion /api/v1/collect       │  │
+                               │  └─────────────────┬──────────────────┘  │
+                               │                    │ Redis Stream        │
+                               │  ┌─────────────────▼──────────────────┐  │
+                               │  │  Stream Worker Consumer            │  │
+                               │  │  • User-Agent & Geo Enrichment     │  │
+                               │  │  • Batch Telemetry Processing      │  │
+                               │  │  • PostgreSQL Batch DB Sync        │  │
+                               │  └──────────────────┬─────────────────┘  │
+                               └──────┬──────────────┼────────────────────┘
+                                      │              │
+                               ┌──────▼──────┐  ┌────▼────────┐
+                               │ PostgreSQL  │  │   Redis     │
+                               │ (Neon DB)   │  │ (Upstash)   │
+                               └─────────────┘  └─────────────┘
 ```
 
 ---
@@ -86,9 +88,10 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 
 ### Backend
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+)
-- **Message Broker & Stream:** [Redis](https://redis.io/) (Redis Streams)
-- **Primary Database & ORM:** [SQLModel](https://sqlmodel.tiangolo.com/) / [SQLAlchemy](https://www.sqlalchemy.org/) (SQLite / PostgreSQL)
-- **Analytics Store:** [ClickHouse](https://clickhouse.com/) Columnar Database
+- **Message Broker & Stream:** [Redis](https://redis.io/) (Upstash Redis Streams)
+- **Primary Database & Analytics:** [SQLModel](https://sqlmodel.tiangolo.com/) / [SQLAlchemy](https://www.sqlalchemy.org/) (PostgreSQL on Neon DB / SQLite)
+- **Data & Statistics:** [NumPy](https://numpy.org/) & [Pandas](https://pandas.pydata.org/) (Z-Score Anomaly Engine)
+- **AI & Security:** OpenAI API (LLM Incident Agent), Shannon Entropy Payload Scanner
 - **Authentication & Security:** JWT tokens, Passlib, OTP verification, CORS middleware
 - **Billing Integration:** [Stripe API](https://stripe.com/)
 
@@ -98,11 +101,10 @@ Comprehensive analytics dashboard showing live pageviews, unique visitors, activ
 - **Visualization:** [Recharts](https://recharts.org/)
 - **Icons & UI:** Lucide React, Custom Selects, Glassmorphic Design Tokens
 
-### DevOps & Infrastructure
+### DevOps & DevSecOps
 - **Containers:** Docker & Docker Compose (Non-root `appuser` container execution)
 - **Hosting:** Render.com (Backend API & Worker), Vercel (Frontend Dashboard)
-- **Database Hosting:** ClickHouse Cloud / Local Docker, Managed PostgreSQL
-- **CI/CD & SAST:** GitHub Actions Matrix Builds, CodeQL SAST Analysis, Aqua Security Trivy Container Scans, Dependabot
+- **CI/CD & Security:** GitHub Actions Matrix Strategy (Python 3.11/3.12 & Node 20/22), CodeQL SAST Analysis, Aqua Security Trivy Container Scans
 
 ---
 
@@ -148,7 +150,7 @@ graph TD
 
 ### Option 1: Running with Docker Compose (Recommended)
 
-Spins up the full stack (Next.js Frontend, FastAPI Backend API, Redis Stream, and Workers) with a single command:
+Spins up the full stack (Vite/React Frontend, FastAPI Backend API, Redis Stream, and Workers) with a single command:
 
 ```bash
 # 1. Clone the repository
@@ -229,7 +231,7 @@ Copy `backend/.env.example` to `backend/.env` and update the environment setting
 | `REDIS_STREAM_KEY` | Yes | Key for event queue stream (default: `events:raw`) |
 | `SECRET_KEY` | Yes | Secret key used for signing authentication JWT tokens |
 | `CORS_ORIGINS` | Yes | Comma-separated allowed frontend origins |
-| `CLICKHOUSE_HOST` | Optional | ClickHouse host address for columnar event analytics |
+| `OPENAI_API_KEY` | Optional | OpenAI Secret Key for LLM incident reasoning & natural language query agent |
 | `STRIPE_SECRET_KEY` | Optional | Stripe Secret Key for processing billing checkout |
 
 ---
@@ -243,34 +245,33 @@ Interactive OpenAPI documentation is available at `http://localhost:8000/docs` (
 | `GET` | `/health` | API health check endpoint |
 | `POST` | `/api/v1/collect` | High-throughput public telemetry event collector |
 | `POST` | `/api/v1/auth/register` | Register a new user account |
-| `POST` | `/api/v1/auth/verify-otp` | Verify user email with OTP code |
 | `POST` | `/api/v1/auth/login` | Login user & issue HTTP-only authentication cookies |
 | `GET` | `/api/v1/auth/me` | Fetch authenticated user profile & plan info |
 | `GET` | `/api/v1/sites` | List site tracking properties for user |
 | `POST` | `/api/v1/sites` | Create a new site tracking property |
-| `DELETE` | `/api/v1/sites/{site_id}` | Delete a site tracking property |
 | `GET` | `/api/v1/stats/summary` | Fetch pageviews, unique visitors, and sessions summary |
 | `GET` | `/api/v1/stats/timeseries` | Get pageview & visitor time-series analytics |
-| `GET` | `/api/v1/stats/pages` | Retrieve top visited page paths |
-| `GET` | `/api/v1/stats/referrers` | Retrieve top traffic referral domains |
-| `GET` | `/api/v1/stats/devices` | Retrieve device type breakdown (Desktop, Mobile, Tablet) |
-| `GET` | `/api/v1/stats/countries` | Retrieve geolocation visitor distributions |
+| `GET` | `/api/v1/ai-security/threats` | Scan telemetry logs for ML-detected OWASP cyber attack vectors |
+| `POST` | `/api/v1/ai-security/llm-analyze` | Generate LLM security report, WAF patch rule, and code fix |
+| `POST` | `/api/v1/ai-security/nl-query` | Execute natural language queries over event telemetry |
 | `POST` | `/api/v1/billing/checkout` | Create Stripe checkout session for plan upgrade |
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Load Benchmarking
 
-### Backend Unit & Integration Tests
+### Backend Unittest Suite
+Run the fresher-friendly unit test suite (Auth, Health Check, ML Cyber Threat Detector, Z-score Anomalies, Funnels):
 ```bash
 cd backend
 python -m unittest discover -s tests -v
 ```
 
-### Frontend Build Verification
+### High-Concurrency Load Test (Locust)
+Simulate high-throughput traffic beacons:
 ```bash
-cd frontend
-npm run build
+pip install locust
+locust -f scripts/load_test.py --headless -u 100 -r 20 --run-time 1m --host http://localhost:8000
 ```
 
 ---
@@ -281,21 +282,19 @@ npm run build
 Luminary/
 ├── docker-compose.yml         # Root Docker Compose orchestration
 ├── README.md                  # Project documentation & setup guide
-├── docs/
-│   └── screenshots/           # Platform UI screenshots
+├── docs/                      # Screenshots & stripe_setup_guide.md
+├── scripts/                   # Performance load testing & event generator scripts
 ├── backend/
 │   ├── app/
-│   │   ├── api/               # FastAPI route handlers (auth, collect, sites, stats, billing)
-│   │   ├── core/              # Config, DB models, security, CORS middleware
-│   │   ├── services/          # Redis stream, ClickHouse client, stats aggregation, enrichment
+│   │   ├── api/               # FastAPI route handlers (collect, auth, stats, ai-security, billing)
+│   │   ├── core/              # DB models, security, CORS middleware
+│   │   ├── services/          # Cyber threat scanner, LLM agent, anomaly engine, stats aggregation
 │   │   └── workers/           # Stream worker for ingestion processing
-│   ├── Dockerfile             # Backend container definition
+│   ├── tests/                 # Clean Python unittest suite (test_api, test_anomalies, test_funnels)
+│   ├── Dockerfile             # Backend container definition (Non-root execution)
 │   └── requirements.txt       # Python dependencies
 └── frontend/
-    ├── src/
-    │   ├── app/               # Next.js App Router pages (login, sites, dashboard/[siteId])
-    │   ├── components/        # Reusable UI components (Sidebar, Charts, UserDropdown, Modals)
-    │   └── lib/               # API client library & utilities
+    ├── src/                   # React 19 + TypeScript dashboard components & pages
     ├── Dockerfile             # Frontend container definition
     └── package.json           # Node dependencies
 ```

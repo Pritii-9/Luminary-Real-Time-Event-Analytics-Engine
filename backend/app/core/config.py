@@ -14,13 +14,6 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:8000,http://127.0.0.1:8000,https://luminary-web-event-engine.vercel.app"
 
 
-    # ClickHouse settings
-    clickhouse_host: str = "localhost"
-    clickhouse_port: int = 8443
-    clickhouse_user: str = "default"
-    clickhouse_password: str = ""
-    clickhouse_secure: bool = False
-
     # Auth / JWT
     jwt_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"

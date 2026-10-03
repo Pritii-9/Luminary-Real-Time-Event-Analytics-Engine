@@ -665,7 +665,7 @@ function SitesPageContent() {
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-3.5 w-3.5 text-success" />
-                        <span>Priority ClickHouse aggregation</span>
+                        <span>Priority analytics aggregation</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="h-3.5 w-3.5 text-success" />

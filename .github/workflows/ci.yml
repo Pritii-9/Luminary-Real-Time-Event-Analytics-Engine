@@ -42,10 +42,7 @@ jobs:
           PYTHONPATH: backend
           APP_ENV: test
           JWT_SECRET: ci-test-secret
-          DATABASE_URL: ""
           REDIS_URL: redis://localhost:6379/0
-          CLICKHOUSE_HOST: localhost
-          CLICKHOUSE_PORT: 8123
         run: |
           # Run pytest with warning suppression (Strict enterprise exit code gate)
           pytest backend/tests/ -W ignore::DeprecationWarning

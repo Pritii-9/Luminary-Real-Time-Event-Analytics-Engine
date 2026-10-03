@@ -57,40 +57,10 @@ def check_redis():
         print(f"Redis connection failed: {exc}")
 
 
-def check_clickhouse():
-    try:
-        import clickhouse_connect
-    except Exception as exc:
-        print(f"clickhouse_connect package not available: {exc}")
-        return
-
-    try:
-        # show the ClickHouse settings pulled from environment/.env
-        pwd = settings.clickhouse_password or ""
-        masked = "*****" if pwd else "(empty)"
-        print(
-            f"ClickHouse settings - host={settings.clickhouse_host} port={settings.clickhouse_port} user={settings.clickhouse_user} secure={settings.clickhouse_secure} password={masked}"
-        )
-        client = clickhouse_connect.get_client(
-            host=settings.clickhouse_host,
-            port=settings.clickhouse_port,
-            username=settings.clickhouse_user,
-            password=settings.clickhouse_password,
-            database="default",
-            secure=settings.clickhouse_secure,
-            verify=False,
-        )
-        # run a lightweight query
-        res = client.query("SELECT 1")
-        print(f"ClickHouse query returned rows: {len(res.result_rows)}")
-    except Exception as exc:
-        print(f"ClickHouse connection/query failed: {exc}")
-
-
 if __name__ == '__main__':
     print("Running Luminary health checks")
     start = time.time()
     check_api()
     check_redis()
-    check_clickhouse()
     print(f"Health checks completed in {time.time()-start:.2f}s")
+

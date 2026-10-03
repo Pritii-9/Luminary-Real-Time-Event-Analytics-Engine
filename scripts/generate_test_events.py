@@ -10,7 +10,7 @@ paths = [
     "/pricing",
     "/about",
     "/blog/fastapi",
-    "/blog/clickhouse",
+    "/blog/postgres",
     "/blog/redis",
 ]
 

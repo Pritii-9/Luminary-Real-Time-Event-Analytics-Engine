@@ -72,6 +72,9 @@ async def add_pna_header(request: Request, call_next):
 
 
 
+from app.api.routes_funnels import router as funnels_router
+from app.api.routes_ai_security import router as ai_security_router
+
 app.include_router(auth_router)
 app.include_router(collect_router)
 app.include_router(sites_router)
@@ -80,6 +83,9 @@ app.include_router(realtime_router)
 app.include_router(tracker_router)
 app.include_router(billing_router)
 app.include_router(replay_router)
+app.include_router(funnels_router)
+app.include_router(ai_security_router)
+
 
 
 

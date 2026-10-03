@@ -1,13 +1,14 @@
-"""Stream worker: consumes events from Redis, enriches, and batch-inserts into ClickHouse."""
+"""Stream worker: consumes events from Redis, enriches, and batch-inserts into SQL Database (PostgreSQL)."""
 
 import json
 import time
 from datetime import datetime, timezone
 
-import clickhouse_connect
 from redis import Redis
+from sqlmodel import Session as SQLSession
 
 from app.core.config import settings
+from app.core.database import EventRecord, engine
 from app.services.enrichment.user_agent import parse_user_agent
 from app.services.enrichment.bot import is_bot
 from app.services.enrichment.geo import enrich_geo
@@ -18,55 +19,6 @@ CONSUMER_NAME = "worker-1"
 BATCH_SIZE = 100
 
 redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-
-clickhouse_client = None
-try:
-    if settings.clickhouse_host:
-        clickhouse_client = clickhouse_connect.get_client(
-            host=settings.clickhouse_host,
-            port=settings.clickhouse_port,
-            username=settings.clickhouse_user,
-            password=settings.clickhouse_password,
-            database="analytics",
-            secure=settings.clickhouse_secure,
-            verify=False,
-            connect_timeout=1.0,
-            send_receive_timeout=1.0,
-        )
-        print("ClickHouse Cloud client initialized successfully.")
-except Exception as e:
-    print(f"ClickHouse Cloud connection failed (will fallback to SQL database): {e}")
-
-
-CLICKHOUSE_COLUMNS = [
-    "event_id",
-    "event_date",
-    "event_time",
-    "site_id",
-    "event_type",
-    "path",
-    "url",
-    "referrer",
-    "device_type",
-    "browser",
-    "browser_version",
-    "os",
-    "os_version",
-    "screen",
-    "session_id",
-    "visitor_id",
-    "ip_hash",
-    "country",
-    "city",
-    "language",
-    "timezone",
-    "utm_source",
-    "utm_medium",
-    "utm_campaign",
-    "utm_term",
-    "utm_content",
-    "is_bot",
-]
 
 
 def ensure_consumer_group():
@@ -86,7 +38,7 @@ def ensure_consumer_group():
 
 
 def process_messages(messages):
-    rows = []
+    db_records = []
     ack_ids = []
 
     for message_id, fields in messages:
@@ -95,108 +47,50 @@ def process_messages(messages):
 
             ts = payload.get("timestamp", time.time())
             dt = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
-
             user_agent = payload.get("user_agent", "")
 
-            # Enrichment: User-Agent
+            # Enrichment: User-Agent, Bot detection, GeoIP
             ua_info = parse_user_agent(user_agent)
-
-            # Enrichment: Bot detection
-            bot_flag = 1 if is_bot(user_agent) else 0
-
-            # Enrichment: GeoIP (uses client_ip, never stored raw)
             client_ip = payload.get("client_ip", "")
             geo = enrich_geo(client_ip)
 
-            row = (
-                payload.get("event_id"),
-                dt.date(),
-                dt,
-                payload.get("site_id"),
-                payload.get("event_type", "pageview"),
-                payload.get("path", ""),
-                payload.get("url", ""),
-                payload.get("referrer", ""),
-                ua_info["device_type"],
-                ua_info["browser"],
-                ua_info["browser_version"],
-                ua_info["os"],
-                ua_info["os_version"],
-                payload.get("screen", ""),
-                payload.get("session_id"),
-                payload.get("visitor_id"),
-                payload.get("ip_hash", ""),
-                geo["country"],
-                geo["city"],
-                payload.get("language", ""),
-                payload.get("timezone", ""),
-                payload.get("utm_source", ""),
-                payload.get("utm_medium", ""),
-                payload.get("utm_campaign", ""),
-                payload.get("utm_term", ""),
-                payload.get("utm_content", ""),
-                bot_flag,
+            record = EventRecord(
+                event_id=payload.get("event_id"),
+                site_id=payload.get("site_id"),
+                event_type=payload.get("event_type", "pageview"),
+                timestamp=int(dt.replace(tzinfo=timezone.utc).timestamp()),
+                url=payload.get("url", ""),
+                path=payload.get("path", ""),
+                referrer=payload.get("referrer", ""),
+                device_type=ua_info.get("device_type", "Desktop"),
+                browser=ua_info.get("browser", "Other"),
+                screen=payload.get("screen", ""),
+                session_id=payload.get("session_id"),
+                visitor_id=payload.get("visitor_id"),
+                country=geo.get("country", "Unknown"),
             )
 
-            rows.append(row)
+            db_records.append(record)
             ack_ids.append(message_id)
 
         except Exception as e:
             print(f"Error processing message {message_id}: {e}")
-            # Push to Dead-Letter Queue for inspection
             dlq_payload = json.dumps(
                 {"message_id": message_id, "data": fields, "error": str(e)}
             )
             redis_client.rpush("luminary:events:dlq", dlq_payload)
             redis_client.xack(STREAM_KEY, GROUP_NAME, message_id)
 
-    if rows:
-        inserted_to_ch = False
-        if clickhouse_client:
-            try:
-                clickhouse_client.insert(
-                    table="analytics.events",
-                    data=rows,
-                    column_names=CLICKHOUSE_COLUMNS,
-                )
-                inserted_to_ch = True
-                print(f"[OK] Inserted {len(rows)} enriched events into ClickHouse.")
-            except Exception as e:
-                print(f"ClickHouse batch insert failed, falling back to SQL: {e}")
-
-        if not inserted_to_ch:
-            # SQL Database batch insert (PostgreSQL or SQLite)
-            try:
-                from app.core.database import EventRecord, engine
-                from sqlmodel import Session as SQLSession
-                
-                db_records = []
-                for r in rows:
-                    db_records.append(EventRecord(
-                        event_id=r[0],
-                        site_id=r[3],
-                        event_type=r[4],
-                        timestamp=int(r[2].replace(tzinfo=timezone.utc).timestamp()),
-                        url=r[6],
-                        path=r[5],
-                        referrer=r[7],
-                        device_type=r[8],
-                        browser=r[9],
-                        screen=r[13],
-                        session_id=r[14],
-                        visitor_id=r[15],
-                        country=r[17] if len(r) > 17 else "Unknown"
-                    ))
-                with SQLSession(engine) as session:
-                    session.add_all(db_records)
-                    session.commit()
-                print(f"[OK] Batch-inserted {len(rows)} events into SQL Database.")
-            except Exception as e:
-                print(f"SQL Database batch insert failed: {e}")
-                # We do not acknowledge (xack) so it can be retried or debugged
-                raise
-
-        redis_client.xack(STREAM_KEY, GROUP_NAME, *ack_ids)
+    if db_records:
+        try:
+            with SQLSession(engine) as session:
+                session.add_all(db_records)
+                session.commit()
+            print(f"[OK] Batch-inserted {len(db_records)} events into SQL Database.")
+            redis_client.xack(STREAM_KEY, GROUP_NAME, *ack_ids)
+        except Exception as e:
+            print(f"SQL Database batch insert failed: {e}")
+            raise
 
 
 
