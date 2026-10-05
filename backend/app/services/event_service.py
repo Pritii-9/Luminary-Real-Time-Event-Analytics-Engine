@@ -33,8 +33,46 @@ def resolve_site_id(event: EventIn) -> str:
     raise HTTPException(status_code=400, detail="site_id or public_token required")
 
 
+def extract_client_ip(request: Request) -> str:
+    """Extract real client IP behind reverse proxies (Cloudflare, Vercel, Render, Nginx)."""
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        return x_real_ip.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+
+def extract_country(request: Request, client_ip: str) -> str:
+    """Extract country from Edge CDN headers (Cloudflare/Vercel) or MaxMind GeoIP fallback."""
+    edge_country = (
+        request.headers.get("cf-ipcountry")
+        or request.headers.get("x-vercel-ip-country")
+        or request.headers.get("x-country-code")
+    )
+    if edge_country and edge_country.upper() not in ("XX", "T1", "UNKNOWN"):
+        return edge_country.upper()
+
+    try:
+        from app.services.enrichment.geo import enrich_geo
+        geo = enrich_geo(client_ip)
+        if geo and geo.get("country"):
+            return geo["country"]
+    except Exception:
+        pass
+
+    return "Unknown"
+
+
 def enrich_event(event: EventIn, request: Request) -> dict:
-    ip = request.client.host if request.client else "unknown"
+    ip = extract_client_ip(request)
+    country = extract_country(request, ip)
     
     # GDPR-compliant: hash IP with daily rotating salt + JWT secret to anonymize visitor tracking
     from datetime import datetime
@@ -75,6 +113,7 @@ def enrich_event(event: EventIn, request: Request) -> dict:
         "utm_campaign": event.utm_campaign or "",
         "utm_term": event.utm_term or "",
         "utm_content": event.utm_content or "",
+        "country": country,
         "client_ip": ip,  # passed for geo enrichment in worker, NOT stored in CH
     }
 

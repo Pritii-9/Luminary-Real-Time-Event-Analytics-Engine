@@ -1,4 +1,4 @@
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from 'react-router-dom';
 import { getSnippet, getSite, getMe, logout, getToken, createPortalSession, type SiteData } from "@/lib/api";
 import { ArrowLeft, Copy, Code } from "lucide-react";
@@ -9,7 +9,7 @@ import AccountSettingsModal from "@/components/AccountSettingsModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function SnippetPage() {
-  const {  siteId  } = useParams();
+  const { siteId } = useParams();
   const navigate = useNavigate();
   const [site, setSite] = useState<SiteData | null>(null);
   const [snippet, setSnippet] = useState("");
@@ -23,19 +23,11 @@ export default function SnippetPage() {
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
-  useEffect(() => {
-    if (!getToken()) {
-      navigate("/login");
-      return;
-    }
-    loadData();
-  }, [siteId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [siteData, snippetData, userData] = await Promise.all([
-        getSite(siteId as string as string),
-        getSnippet(siteId as string as string),
+        getSite(siteId as string),
+        getSnippet(siteId as string),
         getMe().catch(() => null),
       ]);
       setSite(siteData);
@@ -57,7 +49,15 @@ export default function SnippetPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [siteId, navigate]);
+
+  useEffect(() => {
+    if (!getToken()) {
+      navigate("/login");
+      return;
+    }
+    loadData();
+  }, [loadData, navigate]);
 
   function handleCopy() {
     navigator.clipboard.writeText(snippet);

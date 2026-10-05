@@ -1,4 +1,4 @@
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, Outlet } from 'react-router-dom';
 import { getMe, getSite, getToken, logout, createPortalSession, type SiteData } from "@/lib/api";
 import SidebarLayout from "@/components/SidebarLayout";

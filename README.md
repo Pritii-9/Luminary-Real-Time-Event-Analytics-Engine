@@ -1,112 +1,93 @@
-# Luminary 🚀
+# Luminary
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-
-> **AI-Powered Web Telemetry, Cyber Security & Real-Time Analytics Platform**  
-> Luminary is a high-performance, real-time web analytics and security engine built with **FastAPI**, **Redis Streams**, **PostgreSQL**, **NumPy & Pandas**, and **React 19**. It features zero-latency event buffering, background stream workers, ML cyber threat payload scanning (SQLi, XSS, Shannon Entropy), LLM security reasoning, Z-score traffic anomaly detection, conversion funnels, and interactive dashboard charts.
+A privacy-friendly web analytics and telemetry platform designed for high-throughput event ingestion, real-time analytics, and automated security monitoring.
 
 ---
 
-## 🖥️ Platform Screenshots
+## Architecture Overview
 
-### 🌐 1. Multi-Tenant Sites Overview
-Manage website properties, inspect live telemetry status, and view real-time pageviews across all configured properties.
-
-![Sites Overview](docs/screenshots/sites-overview.png)
-
-### 📊 2. Real-Time Analytics Dashboard
-Comprehensive analytics dashboard showing live pageviews, unique visitors, active sessions, traffic time-series graphs, and device breakdowns.
-
-![Analytics Dashboard](docs/screenshots/analytics-dashboard.png)
-
----
-
-## 💡 How Luminary Works (End-to-End Flow)
+Instead of writing events directly to the database on every HTTP request (which causes connection pool saturation and write locks during traffic spikes), Luminary decouples ingestion from persistence using an in-memory stream buffer:
 
 ```
- 1. BROWSER INGESTION        2. FASTAPI API         3. REDIS STREAM        4. BACKGROUND WORKER      5. POSTGRESQL DB
- ┌───────────────────┐    ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐    ┌────────────────┐
- │ tracker.js script │ ──>│ /api/v1/collect │ ──>│ events:raw queue │ ──>│ stream_worker.py │ ──>│ PostgreSQL DB  │
- │ (Captures URL,    │    │ (Rate limiting, │    │ (Sub-5ms buffer) │    │ (Batches 100 evs,│    │ (Indexed event │
- │  screen, clicks)  │    │  Bot filtering) │    │                  │    │  User-Agent, Geo)│    │  records)      │
- └───────────────────┘    └─────────────────┘    └──────────────────┘    └──────────────────┘    └────────────────┘
+[ Client Browser (tracker.js) ]
+               │
+               ▼  POST /api/v1/collect (JSON beacon)
+    [ FastAPI Collector ]
+         ├── Rate Limiting (Redis sliding window)
+         ├── AI Scraper Filter (GPTBot, ClaudeBot)
+         ├── Threat Scanner (OWASP patterns + Shannon Entropy)
+         └── Atomic Quota Check (Redis INCR)
+               │
+               ├──► [ Redis Sorted Set ] ──► Real-Time Concurrent Visitors (5-min window)
+               │
+               └──► [ Redis Stream: events:raw ]
+                           │
+                           ▼ (XREADGROUP in batches of 100)
+                 [ stream_worker.py ]
+                     ├── User-Agent & GeoIP Enrichment
+                     └── Single Bulk SQL Insert ──► [ PostgreSQL / SQLite ]
 ```
 
 ---
 
-## ✨ How Our Engine Catches & Processes Everything
+## Core Capabilities
 
-### 1. 🌐 In the Web Browser (`tracker.js`)
-* **Pageview & Telemetry Capture:** When embedded on a client website, `tracker.js` reads `window.location`, `document.referrer`, screen resolution (`1920x1080`), visitor ID (`localStorage`), and session ID (`sessionStorage`).
-* **Single Page Application (SPA) Tracking:** Intercepts HTML5 `pushState` and `popstate` events to track page changes in React/Next.js without full browser reloads.
-* **Session Replay Tracking:** Listens to mouse clicks and $(x, y)$ coordinates for session replay.
+### 1. Lightweight Telemetry SDK (`tracker.js`)
+* **Under 5KB, zero external dependencies:** Uses native browser APIs without blocking page load (`defer`).
+* **SPA Route Tracking:** Monkey-patches HTML5 `pushState`, `replaceState`, and listens to `popstate` to track page views in single-page apps (React, Next.js, Vue) without page reloads.
+* **Reliable Unload Delivery:** Uses `navigator.sendBeacon` and `fetch` with `keepalive: true` to ensure exit events are delivered when a user closes a tab.
+* **Session Replay Tracking:** Samples normalized cursor coordinates ($x/w$, $y/h$) at 100ms intervals to visualize user heatmaps.
 
-### 2. ⚡ In the Backend API (`FastAPI + Redis Streams`)
-* **Rate Limiting & Bot Filtering:** Checks Redis sliding windows (**60 req/min**) and filters out known automated crawlers (`GPTBot`, `ClaudeBot`).
-* **Zero-Latency Ingestion:** Pushes event payloads into **Redis Streams** (`events:raw`) with **< 5ms** API response times.
+### 2. Stream Ingestion & Micro-Batching
+* **Fast Ingestion:** The collector appends events to a Redis Stream via `XADD` and returns `HTTP 204 No Content` immediately.
+* **Bulk Worker Writes:** A background daemon (`stream_worker.py`) reads events in batches of 100 (`XREADGROUP`) and persists them in a single database transaction, eliminating database write contention.
+* **Real-Time Cardinality:** Uses Redis Sorted Sets (`ZSET`) with `ZREMRANGEBYSCORE` to track active concurrent visitors over a rolling 5-minute window in $O(1)$ memory lookup time.
 
-### 3. ⚙️ In the Background Worker (`stream_worker.py`)
-* **Batch Consumer Loop:** Uses Redis Consumer Groups (`XREADGROUP`) to process events in batches of 100.
-* **Enrichment & Database Sync:** Parses User-Agent strings (Device/Browser type), looks up GeoIP locations, and bulk-inserts records into **PostgreSQL**.
+### 3. Privacy-First Identity (GDPR Compliant)
+* **No Third-Party Cookies:** Uses first-party `localStorage` (`visitor_id`) and `sessionStorage` (`session_id`).
+* **Cryptographic IP Salting:** If storage is disabled, the backend generates an anonymized hash:
+  $$\text{Hash} = \text{SHA-256}(\text{Client IP} + \text{Daily Rotating Salt} + \text{User Agent})$$
+  Because the salt changes daily, visitor tracking across days is mathematically irreversible, ensuring compliance with GDPR and ePrivacy directives.
 
-### 4. 🛡️ Cyber Security & ML Anomaly Engine (`cyber_threat_service.py` & `anomaly_service.py`)
-* **ML Payload Threat Scanner:** Scans URL paths for SQL Injection, XSS, and calculates **Shannon Entropy** to detect obfuscated Base64 attack payloads.
-* **LLM Incident Agent:** Uses OpenAI/LLM capabilities to analyze attack mechanisms, generate Cloudflare WAF firewall rules, and provide developer code fixes.
-* **Z-Score Anomaly Engine:** Uses **NumPy** and **Pandas** to calculate moving averages and Z-scores over hourly traffic data to detect 3-sigma traffic spikes.
+### 4. Statistical Anomaly Detection
+* **Rolling Z-Score Engine:** In [`app/services/anomaly_service.py`](backend/app/services/anomaly_service.py), traffic is evaluated against a 7-day rolling hourly baseline using **NumPy** and **Pandas**:
+  $$Z = \frac{x - \mu}{\sigma}$$
+  Flags a `SPIKE` when $Z \ge 2.5$ and a `DROP_OFF` (downtime or broken routes) when $Z \le -2.0$.
 
-### 5. 📊 On the Frontend Dashboard (`React 19 + Tailwind CSS + Recharts`)
-* Renders real-time time-series pageview graphs, top visited pages, referrer sources, device breakdowns, conversion funnels, and session replays.
-
----
-
-## 🛠️ Tech Stack
-
-### Backend
-- **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+) & Uvicorn Async Server
-- **Message Broker & Stream:** [Redis](https://redis.io/) (Upstash Redis Streams)
-- **Primary Database:** [SQLModel](https://sqlmodel.tiangolo.com/) / [SQLAlchemy](https://www.sqlalchemy.org/) (PostgreSQL on Neon DB / SQLite)
-- **Data & Statistics:** [NumPy](https://numpy.org/) & [Pandas](https://pandas.pydata.org/) (Z-Score Anomaly Engine)
-- **AI & Security:** OpenAI API (LLM Incident Agent), Shannon Entropy Payload Scanner
-- **Authentication:** JWT tokens, Passlib password hashing, CORS middleware
-
-### Frontend
-- **Framework:** [React 19](https://react.dev/) + [Vite](https://vitejs.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/) + Dark/Light Theme System
-- **Visualization:** [Recharts](https://recharts.org/) & Lucide React Icons
-
-### DevOps & Testing
-- **Containers:** Docker & Docker Compose
-- **Testing:** Standard Python `unittest` framework & FastAPI `TestClient`
-- **CI/CD:** GitHub Actions Automated Test Pipeline
+### 5. Threat Intelligence & LLM Triage
+* **OWASP Heuristic Scanner:** Inspects query parameters and paths for SQL injection, XSS, and command injection patterns.
+* **Shannon Entropy Analysis:** Calculates string randomness ($H(X) = -\sum P(x) \log_2 P(x)$) on query strings to detect obfuscated or Base64-encoded exploits.
+* **LLM Incident Analyst:** Sends flagged payloads to **Groq Cloud (Llama 3.1 8B Instant)** to produce a technical exploit breakdown, a ready-to-use Cloudflare/ModSecurity WAF rule, and a developer code remediation snippet.
 
 ---
 
-## 📖 Key API Routes
+## Tech Stack
 
-| Method | Endpoint | What It Does |
-|---|---|---|
-| `GET` | `/health` | API health check endpoint |
-| `POST` | `/api/v1/collect` | High-speed telemetry ingestion beacon |
-| `POST` | `/api/v1/auth/register` | Register new user account |
-| `POST` | `/api/v1/auth/login` | Login user & issue authentication JWT |
-| `GET` | `/api/v1/sites` | List site tracking properties for user |
-| `POST` | `/api/v1/sites` | Create new site tracking property |
-| `GET` | `/api/v1/stats/summary` | Fetch pageviews, unique visitors, and sessions |
-| `GET` | `/api/v1/stats/timeseries` | Get daily pageview time-series metrics |
-| `GET` | `/api/v1/ai-security/threats` | Scan telemetry logs for OWASP cyber attack vectors |
-| `POST` | `/api/v1/ai-security/llm-analyze` | Generate LLM security report, WAF rule, and code fix |
+| Layer | Technologies Used |
+|---|---|
+| **Backend API** | Python 3.11+, FastAPI, Uvicorn, SQLModel / SQLAlchemy, Pydantic |
+| **Streaming & Cache** | Redis (Redis Streams `XADD`, Sorted Sets `ZSET`, Atomic Pipelines) |
+| **Primary Storage** | PostgreSQL (Production) / SQLite (Local development) |
+| **Data & Modeling** | NumPy, Pandas, Shannon Entropy heuristics |
+| **AI / LLM** | Groq Cloud API (`llama-3.1-8b-instant`), OpenAI API fallback |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, Recharts, Lucide Icons |
+| **DevOps & CI/CD** | Docker, Docker Compose, GitHub Actions (Ruff linter + Pytest matrix) |
 
 ---
 
-## 🚀 Quick Start (Local Setup)
+## Local Development Setup
 
-### 1. Backend Setup
+### Prerequisites
+* Python 3.11+
+* Node.js 20+
+* Redis (local or via Docker)
+
+### 1. Start Redis
+```bash
+docker run -d --name luminary-redis -p 6379:6379 redis:alpine
+```
+
+### 2. Backend Setup
 ```bash
 cd backend
 
@@ -117,41 +98,39 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Create environment config
-cp .env.example .env
-
-# Start FastAPI server
+# Start the API server
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 2. Stream Worker Setup
-In a new terminal tab:
+### 3. Start Background Stream Worker (Optional for dev)
+In a separate terminal tab:
 ```bash
 cd backend
 python -m app.workers.stream_worker
 ```
+*(Note: If the stream worker is not running, the collector automatically persists events via asynchronous background tasks).*
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-The frontend will run at `http://localhost:3000`.
+The dashboard will be available at `http://localhost:5173` (or `http://localhost:3000`).
 
 ---
 
-## 🧪 Testing & Load Benchmarking
+## Automated Testing & Benchmarking
 
-### Run Backend Unit Tests
-Run the standard Python test suite (Auth, Health Check, ML Cyber Threat Detector, Z-score Anomalies, Funnels):
+### Run Test Suite
+Runs tests for authentication, health checks, cyber threat scanning, anomaly calculation, and funnel analysis:
 ```bash
 cd backend
-python -m unittest discover -s tests -v
+pytest tests/ -W ignore::DeprecationWarning
 ```
 
-### Run Performance Load Test (Locust)
-Simulate high-throughput traffic beacons:
+### Run Concurrency Load Test (Locust)
+Simulates high-concurrency event ingestion:
 ```bash
 pip install locust
 locust -f scripts/load_test.py --headless -u 100 -r 20 --run-time 1m --host http://localhost:8000
@@ -159,31 +138,16 @@ locust -f scripts/load_test.py --headless -u 100 -r 20 --run-time 1m --host http
 
 ---
 
-## 📂 Directory Structure
+## Embedding the Tracker
 
-```
-Luminary/
-├── docker-compose.yml         # Root Docker Compose file
-├── README.md                  # Project documentation & setup guide
-├── docs/                      # Screenshots & setup guides
-├── scripts/                   # Performance load testing & event generator scripts
-├── backend/
-│   ├── app/
-│   │   ├── api/               # FastAPI route handlers (collect, auth, stats, ai-security)
-│   │   ├── core/              # DB models, config, security
-│   │   ├── services/          # Cyber threat scanner, LLM agent, anomaly engine
-│   │   └── workers/           # Stream worker for event ingestion
-│   ├── tests/                 # Clean Python unittest suite (test_api, test_anomalies, test_funnels)
-│   ├── Dockerfile             # Backend container definition
-│   └── requirements.txt       # Python dependencies
-└── frontend/
-    ├── src/                   # React 19 + TypeScript dashboard components & pages
-    ├── Dockerfile             # Frontend container definition
-    └── package.json           # Node dependencies
+Add this single `<script>` tag to the `<head>` of any website you want to track:
+
+```html
+<script src="https://your-luminary-api.com/tracker.js?site=YOUR_PUBLIC_TOKEN" defer></script>
 ```
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is open-source under the [MIT License](LICENSE).

@@ -18,7 +18,15 @@ async def save_session_replay(request: Request, session: Session = Depends(get_s
         except Exception:
             return {"status": "error", "message": "Invalid format"}
 
-    site_id = data.get("site_id", "unknown")
+    raw_site = data.get("site_id") or data.get("public_token") or "unknown"
+    site_id = raw_site
+    # If client passed public_token (lum_...), map it to site_id (site_...)
+    if str(raw_site).startswith("lum_"):
+        from app.core.database import Site
+        site_record = session.exec(select(Site).where(Site.public_token == raw_site)).first()
+        if site_record:
+            site_id = site_record.site_id
+
     session_id = data.get("session_id", "unknown")
     path = data.get("path", "/")
     coordinates = data.get("coordinates", [])
@@ -42,8 +50,17 @@ async def save_session_replay(request: Request, session: Session = Depends(get_s
 @router.get("/api/session-replay/list/{site_id}")
 @router.get("/api/v1/session-replay/list/{site_id}")
 def list_site_replays(site_id: str, session: Session = Depends(get_session)):
+    target_id = site_id
+    if site_id.startswith("lum_"):
+        from app.core.database import Site
+        site_record = session.exec(select(Site).where(Site.public_token == site_id)).first()
+        if site_record:
+            target_id = site_record.site_id
+
     replays = session.exec(
-        select(SessionReplay).where(SessionReplay.site_id == site_id).order_by(SessionReplay.created_at.desc())
+        select(SessionReplay).where(
+            (SessionReplay.site_id == target_id) | (SessionReplay.site_id == site_id)
+        ).order_by(SessionReplay.created_at.desc())
     ).all()
     
     result = []

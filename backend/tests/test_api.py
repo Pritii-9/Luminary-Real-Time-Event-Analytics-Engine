@@ -31,7 +31,8 @@ class TestLuminaryAPI(unittest.TestCase):
 
     def test_2_auth_register_and_login(self):
         """Test registration and login flow for a new user."""
-        email = "fresher_test@luminary.dev"
+        import uuid
+        email = f"test_{uuid.uuid4().hex[:8]}@luminary.dev"
         password = "Password123!"
 
         # 1. Register new user
@@ -39,7 +40,7 @@ class TestLuminaryAPI(unittest.TestCase):
             "email": email,
             "password": password
         })
-        self.assertIn(reg_response.status_code, [201, 409])
+        self.assertEqual(reg_response.status_code, 201)
 
         # 2. Login user
         login_response = self.client.post("/api/v1/auth/login", json={

@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react";
 import { fetchCustomEvents, fetchSummary } from "@/lib/api";
 import { Zap, Code } from "lucide-react";
 

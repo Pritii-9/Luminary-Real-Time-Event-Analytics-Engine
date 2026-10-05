@@ -10,25 +10,56 @@
   var ua = navigator.userAgent || "";
   if (/bot|crawler|spider|scraper|headless|phantom|selenium|puppeteer/i.test(ua)) return;
 
-  // --- Read public_token / site_id from the script tag ---
-  var scripts = document.getElementsByTagName("script");
+  // --- Read public_token / site_id and API host from script tag or window config ---
   var token = "";
   var apiBase = "";
 
-  for (var i = 0; i < scripts.length; i++) {
-    var s = scripts[i];
+  function inspectScript(s) {
+    if (!s) return;
     var src = s.src || "";
-    if (src.indexOf("tracker") !== -1 || src.indexOf("script.js") !== -1) {
-      token = s.getAttribute("data-site-id") || s.getAttribute("data-site") || "";
-      if (!token) {
-        var match = src.match(/[?&](site|site_id|token)=([^&]+)/);
-        if (match) token = decodeURIComponent(match[2]);
-      }
+    var foundToken = s.getAttribute("data-site-id") || s.getAttribute("data-site") || "";
+    if (!foundToken && src) {
+      var match = src.match(/[?&](site|site_id|token)=([^&]+)/);
+      if (match) foundToken = decodeURIComponent(match[2]);
+    }
+    var customHost = s.getAttribute("data-api-host") || s.getAttribute("data-api") || s.getAttribute("data-host");
+    var foundOrigin = "";
+    if (customHost) {
+      foundOrigin = customHost.replace(/\/$/, "");
+    } else if (src) {
       try {
-        var url = new URL(src);
-        apiBase = url.origin;
+        var parsedUrl = new URL(src, window.location.href);
+        foundOrigin = parsedUrl.origin;
       } catch (e) {}
-      if (token) break;
+    }
+    if (foundToken && !token) token = foundToken;
+    if (foundOrigin && !apiBase) apiBase = foundOrigin;
+  }
+
+  // 1. Check document.currentScript (standard modern browser API)
+  if (document.currentScript) {
+    inspectScript(document.currentScript);
+  }
+
+  // 2. Check global configuration object if available
+  if (!token || !apiBase) {
+    var globalCfg = window.LUMINARY_CONFIG || window.luminaryConfig;
+    if (globalCfg) {
+      token = token || globalCfg.siteId || globalCfg.token || globalCfg.site;
+      apiBase = apiBase || globalCfg.apiHost || globalCfg.host || globalCfg.endpoint;
+    }
+  }
+
+  // 3. Fallback: scan all script tags
+  if (!token || !apiBase) {
+    var scripts = document.getElementsByTagName("script");
+    for (var i = 0; i < scripts.length; i++) {
+      var s = scripts[i];
+      var src = s.src || "";
+      if (src.indexOf("tracker") !== -1 || src.indexOf("script.js") !== -1 || s.getAttribute("data-site-id") || s.getAttribute("data-site")) {
+        inspectScript(s);
+        if (token && apiBase) break;
+      }
     }
   }
 
@@ -214,15 +245,34 @@
     if (coords.length === 0) return;
 
     var payload = {
-      site_id: token.startsWith("site_") ? token : undefined,
+      site_id: token,
+      public_token: token,
       session_id: token + "_" + Date.now(),
       path: window.location.pathname,
       coordinates: coords
     };
 
     var REPLAY_URL = (apiBase || window.location.origin) + "/api/session-replay";
-    var blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-    navigator.sendBeacon(REPLAY_URL, blob);
+    var payloadStr = JSON.stringify(payload);
+    var sent = false;
+
+    if (navigator.sendBeacon) {
+      try {
+        var blob = new Blob([payloadStr], { type: "text/plain" });
+        sent = navigator.sendBeacon(REPLAY_URL, blob);
+      } catch (e) {
+        sent = false;
+      }
+    }
+
+    if (!sent) {
+      fetch(REPLAY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payloadStr,
+        keepalive: true,
+      }).catch(function () {});
+    }
   }
 
   window.addEventListener("pagehide", flushReplay);

@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useState, use } from "react";
+import { useState } from "react";
 import { fetchPages, fetchReferrers, fetchDevices, fetchCustomEvents, fetchTimeseries } from "@/lib/api";
 import { Download, FileSpreadsheet, FileJson, Calendar } from "lucide-react";
 import Toast from "@/components/Toast";

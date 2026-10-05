@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useMemo } from "react";
+import { useCallback, useEffect, useState, Suspense, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   listSites,
@@ -99,31 +99,7 @@ function SitesPageContent() {
 
   const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    if (!getToken()) {
-      router.push("/login");
-      return;
-    }
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    const upgrade = searchParams.get("upgrade");
-    const portal = searchParams.get("portal");
-    if (upgrade === "success") {
-      setToast({ message: `Upgraded to ${searchParams.get("plan")}. Welcome aboard.`, type: "success" });
-      loadData();
-      router.replace("/sites");
-    } else if (upgrade === "cancel") {
-      setToast({ message: "Upgrade cancelled.", type: "error" });
-      router.replace("/sites");
-    } else if (portal === "mock") {
-      setToast({ message: "Billing portal simulated.", type: "success" });
-      router.replace("/sites");
-    }
-  }, [searchParams]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [user, siteList] = await Promise.all([getMe(), listSites()]);
       setUserEmail(user.email);
@@ -149,7 +125,31 @@ function SitesPageContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.push("/login");
+      return;
+    }
+    loadData();
+  }, [router, loadData]);
+
+  useEffect(() => {
+    const upgrade = searchParams.get("upgrade");
+    const portal = searchParams.get("portal");
+    if (upgrade === "success") {
+      setToast({ message: `Upgraded to ${searchParams.get("plan")}. Welcome aboard.`, type: "success" });
+      loadData();
+      router.replace("/sites");
+    } else if (upgrade === "cancel") {
+      setToast({ message: "Upgrade cancelled.", type: "error" });
+      router.replace("/sites");
+    } else if (portal === "mock") {
+      setToast({ message: "Billing portal simulated.", type: "success" });
+      router.replace("/sites");
+    }
+  }, [searchParams, router, loadData]);
 
   async function handleUpgrade(selectedPlan: string) {
     setUpgrading(selectedPlan);

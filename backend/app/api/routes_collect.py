@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Request, Response, Depends, HTTPException
+from fastapi import APIRouter, Request, Response, Depends, HTTPException, BackgroundTasks
 from urllib.parse import urlparse
 from sqlmodel import Session, select
 import json
@@ -68,8 +68,51 @@ async def get_site_details(site_id: str | None, public_token: str | None, sessio
 
     return details
 
+def _persist_event_async(payload: dict):
+    """Background fallback: persist event to DB if stream_worker is inactive."""
+    try:
+        from user_agents import parse
+        from app.core.database import EventRecord, engine
+        from sqlmodel import Session as SQLSession
+        from app.services.cache_service import invalidate_site_cache
+
+        ua_str = payload.get("user_agent", "")
+        ua = parse(ua_str)
+        dev_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
+        browser_name = ua.browser.family or "Chrome"
+
+        record = EventRecord(
+            event_id=payload.get("event_id"),
+            site_id=payload.get("site_id"),
+            event_type=payload.get("event_type", "pageview"),
+            timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
+            url=payload.get("url", ""),
+            path=payload.get("path", "/"),
+            referrer=payload.get("referrer", ""),
+            session_id=payload.get("session_id", ""),
+            visitor_id=payload.get("visitor_id", ""),
+            screen=payload.get("screen", ""),
+            device_type=dev_type,
+            browser=browser_name,
+            country=payload.get("country", "Unknown"),
+        )
+        with SQLSession(engine) as session:
+            session.add(record)
+            session.commit()
+
+        # Clear stats cache so dashboard reflects count instantly
+        invalidate_site_cache(payload.get("site_id"))
+    except Exception as exc:
+        logging.warning(f"Background DB event save failed: {exc}")
+
+
 @router.post("/api/v1/collect", status_code=204)
-async def collect(event: EventIn, request: Request, session: Session = Depends(get_session)):
+async def collect(
+    event: EventIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
     # 0. Rate limiting check (60 requests/min)
     if await is_rate_limited(request, "collect", limit=60, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many events sent. Please slow down.")
@@ -192,39 +235,7 @@ async def collect(event: EventIn, request: Request, session: Session = Depends(g
     except Exception as exc:
         logging.error(f"Update realtime timeout/error: {exc}")
 
-    # Always persist event directly to DB so metrics update immediately without worker dependency
-    try:
-        from user_agents import parse
-        from app.core.database import EventRecord
-        from app.services.cache_service import invalidate_site_cache
-
-        ua_str = payload.get("user_agent", "")
-        ua = parse(ua_str)
-        dev_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
-        browser_name = ua.browser.family or "Chrome"
-
-        record = EventRecord(
-            event_id=payload.get("event_id"),
-            site_id=payload.get("site_id"),
-            event_type=payload.get("event_type", "pageview"),
-            timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
-            url=payload.get("url", ""),
-            path=payload.get("path", "/"),
-            referrer=payload.get("referrer", ""),
-            session_id=payload.get("session_id", ""),
-            visitor_id=payload.get("visitor_id", ""),
-            screen=payload.get("screen", ""),
-            device_type=dev_type,
-            browser=browser_name,
-            country="Unknown",
-        )
-        session.add(record)
-        session.commit()
-
-        # Clear stats cache so dashboard reflects count instantly
-        invalidate_site_cache(payload.get("site_id"))
-        logging.info(f"Persisted event to DB for site {payload.get('site_id')}")
-    except Exception as exc:
-        logging.warning(f"DB event save failed: {exc}")
+    # Queue async DB persistence fallback without blocking the HTTP response thread (< 10ms response guarantee)
+    background_tasks.add_task(_persist_event_async, payload)
 
     return Response(status_code=204)

@@ -49,17 +49,23 @@ from fastapi import Request, Response
 
 @app.middleware("http")
 async def public_collect_cors_middleware(request: Request, call_next):
-    if request.url.path.startswith("/api/v1/collect"):
+    is_public = (
+        request.url.path.startswith("/api/v1/collect")
+        or request.url.path.startswith("/api/session-replay")
+        or request.url.path.startswith("/api/v1/session-replay")
+        or request.url.path in ("/tracker.js", "/script.js", "/api/v1/tracker/script.js")
+    )
+    if is_public:
+        origin = request.headers.get("origin") or "*"
         if request.method == "OPTIONS":
-            response = Response()
+            response = Response(status_code=200)
         else:
             response = await call_next(request)
             
-        origin = request.headers.get("origin")
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
         return response
     return await call_next(request)
 

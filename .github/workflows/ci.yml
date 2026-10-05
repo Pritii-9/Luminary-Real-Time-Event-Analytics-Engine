@@ -41,11 +41,10 @@ jobs:
         env:
           PYTHONPATH: backend
           APP_ENV: test
-          JWT_SECRET: ci-test-secret
+          JWT_SECRET: ci-test-secret-32-characters-long-production-key
           REDIS_URL: redis://localhost:6379/0
         run: |
-          # Run pytest with warning suppression (Strict enterprise exit code gate)
-          pytest backend/tests/ -W ignore::DeprecationWarning
+          pytest backend/tests/ -W ignore
 
   frontend-build:
     name: Frontend Build (Node ${{ matrix.node-version }})
