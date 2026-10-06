@@ -1,6 +1,6 @@
 """Stats query service with Redis caching and SQL Database (PostgreSQL) aggregation."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlmodel import Session as SQLSession, select, func
 
@@ -9,7 +9,7 @@ from app.core.database import engine, EventRecord
 
 
 def _cutoff_timestamp(days: int) -> int:
-    return int((datetime.utcnow() - timedelta(days=days)).timestamp())
+    return int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
 
 
 def _with_session(fn, session=None):

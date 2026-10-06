@@ -1,6 +1,6 @@
 """AI & Statistical Anomaly Detection Service using NumPy and Pandas."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 from sqlalchemy import text
@@ -11,7 +11,7 @@ from app.core.database import engine
 
 def detect_traffic_anomalies(site_id: str, days: int = 7, session: SQLSession = None) -> dict:
     """Calculates rolling Z-scores and moving averages to detect traffic spikes or drop-offs."""
-    cutoff_timestamp = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+    cutoff_timestamp = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
 
     def _query_hourly_counts(sess):
         dialect_name = sess.get_bind().dialect.name if hasattr(sess, "get_bind") and sess.get_bind() else engine.dialect.name

@@ -85,7 +85,7 @@ def _persist_event_async(payload: dict):
             event_id=payload.get("event_id"),
             site_id=payload.get("site_id"),
             event_type=payload.get("event_type", "pageview"),
-            timestamp=payload.get("timestamp", int(datetime.datetime.utcnow().timestamp())),
+            timestamp=payload.get("timestamp", int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
             url=payload.get("url", ""),
             path=payload.get("path", "/"),
             referrer=payload.get("referrer", ""),
@@ -138,7 +138,7 @@ async def collect(
                 site_id=details["site_id"],
                 bot_name=matched_bot,
                 target_url=str(event.url),
-                timestamp=int(datetime.datetime.utcnow().timestamp())
+                timestamp=int(datetime.datetime.now(datetime.timezone.utc).timestamp())
             )
             session.add(bot_log)
             session.commit()
@@ -194,7 +194,7 @@ async def collect(
 
 
     # 4. Check and increment quota limit
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     month_str = now.strftime("%Y-%m")
     quota_key = f"quota:{details['site_id']}:{month_str}"
     

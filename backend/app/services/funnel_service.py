@@ -1,6 +1,6 @@
 """Conversion Funnel & Drop-off Analysis Service."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from sqlalchemy import text
 from sqlmodel import Session as SQLSession, select
@@ -71,7 +71,7 @@ def delete_funnel(funnel_id: int, user_id: int, session: SQLSession = None) -> b
 
 def analyze_funnel(funnel_id: int, days: int = 30, session: SQLSession = None) -> dict:
     """Computes step-by-step visitor counts, retention %, and drop-off % for a funnel."""
-    cutoff_timestamp = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+    cutoff_timestamp = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
 
     def _run(sess):
         funnel = sess.exec(select(Funnel).where(Funnel.id == funnel_id)).first()

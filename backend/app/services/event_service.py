@@ -75,8 +75,8 @@ def enrich_event(event: EventIn, request: Request) -> dict:
     country = extract_country(request, ip)
     
     # GDPR-compliant: hash IP with daily rotating salt + JWT secret to anonymize visitor tracking
-    from datetime import datetime
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    from datetime import datetime, timezone
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     salt = settings.jwt_secret
     ip_hash = hashlib.sha256(f"{ip}-{today_str}-{salt}".encode()).hexdigest()
 

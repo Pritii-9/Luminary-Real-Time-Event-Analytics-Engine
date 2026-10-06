@@ -1,11 +1,15 @@
 """SQLite metadata database: users and sites tables."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Field, SQLModel, create_engine, Session as SQLSession
 
 from app.core.config import settings
+
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class User(SQLModel, table=True):
@@ -17,7 +21,7 @@ class User(SQLModel, table=True):
     full_name: Optional[str] = Field(default=None, max_length=255)
     company_name: Optional[str] = Field(default=None, max_length=255)
     is_verified: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_utc_now)
     
     # Subscription & Billing
     plan: str = Field(default="free", max_length=32)
@@ -36,7 +40,7 @@ class Site(SQLModel, table=True):
     domain: str = Field(max_length=255)
     public_token: str = Field(unique=True, index=True, max_length=64)
     site_id: str = Field(unique=True, index=True, max_length=64)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_utc_now)
 
 
 class EventRecord(SQLModel, table=True):
@@ -56,7 +60,7 @@ class EventRecord(SQLModel, table=True):
     device_type: str = Field(default="desktop", max_length=32)
     browser: str = Field(default="Chrome", max_length=32)
     country: str = Field(default="Unknown", max_length=64)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_utc_now)
 
 class BotTrafficLog(SQLModel, table=True):
     __tablename__ = "bot_traffic_logs"
@@ -76,7 +80,7 @@ class SessionReplay(SQLModel, table=True):
     session_id: str = Field(index=True, max_length=64)
     path: str = Field(max_length=255)
     coordinates: str = Field(default="[]")  # stored as JSON string
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_utc_now)
 
 
 class Funnel(SQLModel, table=True):
@@ -87,7 +91,7 @@ class Funnel(SQLModel, table=True):
     site_id: str = Field(index=True, max_length=64)
     name: str = Field(max_length=128)
     steps_json: str = Field(default="[]")  # JSON list of steps: [{"name": "Step 1", "path": "/"}]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_utc_now)
 
 
 
