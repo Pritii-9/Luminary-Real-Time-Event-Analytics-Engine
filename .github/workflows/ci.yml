@@ -10,6 +10,16 @@ jobs:
   backend-test:
     name: Backend Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       fail-fast: false
       matrix:
@@ -43,8 +53,10 @@ jobs:
           APP_ENV: test
           JWT_SECRET: ci-test-secret-32-characters-long-production-key
           REDIS_URL: redis://localhost:6379/0
+          SQLITE_PATH: backend/data/luminary.db
         run: |
-          pytest backend/tests/ -W ignore
+          mkdir -p backend/data
+          pytest backend/tests/ -v --tb=short -W ignore
 
   frontend-build:
     name: Frontend Build (Node ${{ matrix.node-version }})

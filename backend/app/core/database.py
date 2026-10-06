@@ -108,7 +108,11 @@ if settings.database_url:
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     engine = create_engine(db_url, echo=False)
 else:
-    engine = create_engine(f"sqlite:///{settings.sqlite_path}", echo=False)
+    engine = create_engine(
+        f"sqlite:///{settings.sqlite_path}",
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
 
 
 

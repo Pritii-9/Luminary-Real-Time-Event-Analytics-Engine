@@ -10,6 +10,10 @@ import unittest
 # Ensure the backend directory is in the Python search path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Ensure a valid 32+ byte key for PyJWT compliance
+if not os.environ.get("JWT_SECRET") or len(os.environ.get("JWT_SECRET", "")) < 32:
+    os.environ["JWT_SECRET"] = "ci-test-secret-32-characters-long-production-key"
+
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import create_tables
