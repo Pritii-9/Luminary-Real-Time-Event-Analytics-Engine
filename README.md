@@ -8,12 +8,12 @@ A high-throughput distributed telemetry ingestion engine and real-time observabi
 
 | Resource | Live Endpoint | Description |
 |:---|:---|:---|
-| **Web Console (SPA)** | [luminary-scalable-web-event-engine.vercel.app](https://luminary-scalable-web-event-engine.vercel.app) | React 19 / Vite telemetry console with in-place SRE inspection |
+| **Web Console (SPA)** | [luminary-zeta-five.vercel.app](https://luminary-zeta-five.vercel.app) | React 19 / Vite telemetry console with in-place SRE inspection |
 | **Backend Ingestion API** | [luminary-scalable-web-event-engine.onrender.com](https://luminary-scalable-web-event-engine.onrender.com) | FastAPI high-throughput collector service |
 | **OpenMetrics Exporter** | [luminary-scalable-web-event-engine.onrender.com/metrics](https://luminary-scalable-web-event-engine.onrender.com/metrics) | Live OpenMetrics exposition for Prometheus & Datadog |
 | **API Health Check** | [luminary-scalable-web-event-engine.onrender.com/health](https://luminary-scalable-web-event-engine.onrender.com/health) | Live service uptime & Redis connectivity status |
 
-> **⚡ 1-Click Recruiter Sandbox:** Open [the Live App](https://luminary-scalable-web-event-engine.vercel.app/login) and click **"1-Click Recruiter Demo Access"** to immediately access an enterprise workspace pre-seeded with active telemetry and OWASP exploit logs (no registration required).
+> **⚡ 1-Click Recruiter Sandbox:** Open [the Live Web App](https://luminary-zeta-five.vercel.app/login) and click **"1-Click Recruiter Demo Access"** to immediately access an enterprise workspace pre-seeded with active telemetry and OWASP exploit logs (no registration required).
 > 
 > *Manual credentials:* `demo@luminary.dev` / `demo123`
 
