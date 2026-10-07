@@ -37,6 +37,9 @@ THREAT_PATTERNS = {
     "REMOTE_CODE_EXECUTION": [
         r"(?i)(eval\s*\(|base64_decode\s*\(|system\s*\(|passthru\s*\()",
         r"(?i)(python\s*-c|perl\s*-e|php\s*-r)"
+    ],
+    "DOM_TAMPERING": [
+        r"(?i)(DOM_TAMPERING|unauthorized_script|client-integrity|magecart)"
     ]
 }
 
@@ -79,8 +82,8 @@ def scan_payload_threats(url: str, path: str, referrer: str, user_agent: str) ->
     total_threat_score = min(1.0, round(entropy_risk + length_risk + pattern_risk, 2))
 
     # Severity Level Mapping
-    if total_threat_score >= 0.7 or "SQL_INJECTION" in detected_categories or "COMMAND_INJECTION" in detected_categories:
-        severity = "CRITICAL"
+    if total_threat_score >= 0.7 or "SQL_INJECTION" in detected_categories or "COMMAND_INJECTION" in detected_categories or "DOM_TAMPERING" in detected_categories:
+        severity = "CRITICAL" if ("SQL_INJECTION" in detected_categories or "COMMAND_INJECTION" in detected_categories) else "HIGH"
     elif total_threat_score >= 0.4:
         severity = "HIGH"
     elif total_threat_score >= 0.2:

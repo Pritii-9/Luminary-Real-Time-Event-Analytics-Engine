@@ -281,5 +281,88 @@
       flushReplay();
     }
   });
+
+  // --- Client-Side Integrity Monitoring (Anti-Tampering / Magecart Defense) ---
+  function calculateEntropy(str) {
+    if (!str || str.length === 0) return 0;
+    var freq = {}, len = str.length;
+    for (var i = 0; i < len; i++) {
+      freq[str[i]] = (freq[str[i]] || 0) + 1;
+    }
+    var entropy = 0;
+    for (var char in freq) {
+      var p = freq[char] / len;
+      entropy -= p * (Math.log(p) / Math.LN2);
+    }
+    return Number(entropy.toFixed(3));
+  }
+
+  function reportTampering(scriptEl, reason) {
+    var src = scriptEl.src || "";
+    var content = scriptEl.innerHTML || scriptEl.textContent || "";
+    var sample = (src ? "src=" + src : content.slice(0, 200)).trim();
+    var entropy = calculateEntropy(content || src);
+
+    // Send threat alert to telemetry collector
+    send({
+      event_type: "threat",
+      path: "/security/client-integrity",
+      url: window.location.href + "?threat=DOM_TAMPERING&entropy=" + entropy + "&vector=" + encodeURIComponent(sample.slice(0, 80)),
+      referrer: "integrity-observer",
+      screen: JSON.stringify({
+        threat_type: "DOM_TAMPERING",
+        reason: reason,
+        entropy: entropy,
+        sample: sample.slice(0, 150)
+      })
+    });
+
+    if (window.console && window.console.warn) {
+      console.warn("[Luminary Security] Unauthorized DOM script injection intercepted:", sample.slice(0, 80));
+    }
+  }
+
+  try {
+    if (typeof MutationObserver !== "undefined") {
+      var observedScripts = new WeakSet();
+      // Whitelist current scripts
+      var existing = document.getElementsByTagName("script");
+      for (var sIdx = 0; sIdx < existing.length; sIdx++) {
+        observedScripts.add(existing[sIdx]);
+      }
+
+      var integrityObserver = new MutationObserver(function (mutations) {
+        for (var m = 0; m < mutations.length; m++) {
+          var mutation = mutations[m];
+          if (mutation.type === "childList") {
+            for (var a = 0; a < mutation.addedNodes.length; a++) {
+              var node = mutation.addedNodes[a];
+              if (node.nodeType === 1) { // ELEMENT_NODE
+                if (node.tagName === "SCRIPT" && !observedScripts.has(node)) {
+                  observedScripts.add(node);
+                  reportTampering(node, "unauthorized_script_node_inserted");
+                } else if (node.getElementsByTagName) {
+                  var nested = node.getElementsByTagName("script");
+                  for (var n = 0; n < nested.length; n++) {
+                    if (!observedScripts.has(nested[n])) {
+                      observedScripts.add(nested[n]);
+                      reportTampering(nested[n], "unauthorized_nested_script_injected");
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      integrityObserver.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+  } catch (err) {
+    // Fail-open for client safety
+  }
 })();
 

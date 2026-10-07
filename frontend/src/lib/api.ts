@@ -401,6 +401,41 @@ export async function queryTelemetryWithNL(siteId: string, query: string) {
   });
 }
 
+export interface ChaosTestResult {
+  status: string;
+  event_id: string;
+  site_id: string;
+  payload_type: string;
+  dispatched_payload: string;
+  detection: {
+    threat_detected: boolean;
+    threat_score: number;
+    severity: string;
+    categories: string[];
+    payload_entropy: number;
+    analyzed_target: string;
+  };
+  timestamp: number;
+  message: string;
+}
+
+export async function dispatchChaosPayload(params: {
+  siteId: string;
+  payloadType: string;
+  targetPath?: string;
+  customPayload?: string;
+}) {
+  return apiFetch<ChaosTestResult>("/api/v1/ai-security/chaos-test", {
+    method: "POST",
+    body: JSON.stringify({
+      site_id: params.siteId,
+      payload_type: params.payloadType,
+      target_path: params.targetPath || "/api/v1/resource",
+      custom_payload: params.customPayload || null,
+    }),
+  });
+}
+
 export async function simulateCyberThreats(siteId: string) {
   return apiFetch<{ status: string; message: string; simulated_count: number }>("/api/v1/ai-security/simulate", {
     method: "POST",

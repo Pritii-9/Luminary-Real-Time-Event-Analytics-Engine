@@ -22,12 +22,15 @@ import {
   Radio,
   ChevronDown,
   ExternalLink,
+  Flame,
+  Bug,
 } from "lucide-react";
 import {
   getCyberThreats,
   analyzeThreatWithLLM,
   queryTelemetryWithNL,
   simulateCyberThreats,
+  dispatchChaosPayload,
   getSreTelemetry,
   fetchRawPrometheusMetrics,
   testSecurityWebhook,
@@ -36,6 +39,7 @@ import {
   type LLMIncidentReport,
   type NLQueryResult,
   type SreTelemetryData,
+  type ChaosTestResult,
 } from "@/lib/api";
 
 export default function SecurityPage() {
@@ -53,8 +57,16 @@ export default function SecurityPage() {
   // In-Page Collapsible Panels (Replaces intrusive centered popups)
   const [showMetricsPanel, setShowMetricsPanel] = useState(false);
   const [showWebhookPanel, setShowWebhookPanel] = useState(false);
+  const [showChaosPanel, setShowChaosPanel] = useState(false);
   const [rawMetrics, setRawMetrics] = useState<string>("");
   const [metricsLoading, setMetricsLoading] = useState(false);
+
+  // Chaos Sandbox State
+  const [chaosPayloadType, setChaosPayloadType] = useState<string>("SQL_INJECTION");
+  const [chaosTargetPath, setChaosTargetPath] = useState<string>("/api/v1/users");
+  const [chaosCustomString, setChaosCustomString] = useState<string>("");
+  const [chaosDispatching, setChaosDispatching] = useState<boolean>(false);
+  const [chaosResult, setChaosResult] = useState<ChaosTestResult | null>(null);
 
   // Webhook State
   const [webhookUrl, setWebhookUrl] = useState("https://webhook.site/test-security-alert");
@@ -159,6 +171,27 @@ export default function SecurityPage() {
     }
   };
 
+  const handleDispatchChaos = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteId) return;
+    setChaosDispatching(true);
+    setChaosResult(null);
+    try {
+      const res = await dispatchChaosPayload({
+        siteId,
+        payloadType: chaosPayloadType,
+        targetPath: chaosTargetPath,
+        customPayload: chaosCustomString,
+      });
+      setChaosResult(res);
+      await loadData();
+    } catch (err: any) {
+      console.error("Chaos dispatch failed", err);
+    } finally {
+      setChaosDispatching(false);
+    }
+  };
+
   const handleNLSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!siteId || !searchQuery.trim()) return;
@@ -258,8 +291,26 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
 
           <button
             onClick={() => {
+              setShowChaosPanel(!showChaosPanel);
+              if (showMetricsPanel) setShowMetricsPanel(false);
+              if (showWebhookPanel) setShowWebhookPanel(false);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
+              showChaosPanel
+                ? "bg-foreground text-background font-semibold border-foreground"
+                : "border-card-border bg-card hover:bg-foreground/[0.04] text-foreground"
+            }`}
+            title="Launch synthetic attacks in a safe sandbox to test pipeline alerting"
+          >
+            <Flame className="h-3.5 w-3.5 text-amber-500" />
+            <span>Chaos Sandbox</span>
+          </button>
+
+          <button
+            onClick={() => {
               setShowWebhookPanel(!showWebhookPanel);
               if (showMetricsPanel) setShowMetricsPanel(false);
+              if (showChaosPanel) setShowChaosPanel(false);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
               showWebhookPanel
@@ -276,6 +327,7 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
             onClick={() => {
               setShowMetricsPanel(!showMetricsPanel);
               if (showWebhookPanel) setShowWebhookPanel(false);
+              if (showChaosPanel) setShowChaosPanel(false);
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer ${
               showMetricsPanel
@@ -408,6 +460,129 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
         </div>
       )}
 
+      {/* ── 3.5 IN-PAGE CHAOS SANDBOX (Synthetic Threat Generator) ── */}
+      {showChaosPanel && (
+        <div className="rounded-lg border border-card-border bg-card p-4 animate-fade-in space-y-4">
+          <div className="flex items-center justify-between border-b border-card-border pb-2.5">
+            <div className="flex items-center gap-2">
+              <Flame className="h-4 w-4 text-amber-500" />
+              <div>
+                <span className="text-xs font-semibold text-foreground">Synthetic Threat Generator (The &ldquo;Chaos Sandbox&rdquo;)</span>
+                <p className="text-[11px] text-muted">Safely inject mock exploit payloads against your tenant pipeline to validate heuristic scanners, entropy engines, and alerting.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowChaosPanel(false)}
+              className="text-muted hover:text-foreground p-1 rounded hover:bg-foreground/[0.04] transition-colors cursor-pointer"
+              title="Close Chaos Sandbox"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleDispatchChaos} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-4 space-y-1">
+                <label className="text-[11px] font-medium text-muted">Exploit Vector (OWASP &amp; Client Integrity)</label>
+                <select
+                  value={chaosPayloadType}
+                  onChange={(e) => setChaosPayloadType(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-medium text-foreground focus:outline-none cursor-pointer"
+                >
+                  <option value="SQL_INJECTION">SQL Injection (UNION / Sleep Probe)</option>
+                  <option value="XSS_ATTACK">Cross-Site Scripting (Reflected Tag)</option>
+                  <option value="PATH_TRAVERSAL">Directory Traversal (/etc/shadow)</option>
+                  <option value="SSRF_ATTACK">SSRF Probe (169.254 AWS Metadata)</option>
+                  <option value="COMMAND_INJECTION">OS Command Injection (; cat /etc/passwd)</option>
+                  <option value="DOM_TAMPERING">DOM Tampering (Magecart Script Inject)</option>
+                  <option value="HIGH_ENTROPY">High Shannon Entropy (Obfuscated Payload)</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-5 space-y-1">
+                <label className="text-[11px] font-medium text-muted">Target Endpoint Path</label>
+                <input
+                  type="text"
+                  required
+                  value={chaosTargetPath}
+                  onChange={(e) => setChaosTargetPath(e.target.value)}
+                  placeholder="/api/v1/search or /checkout"
+                  className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-mono text-foreground focus:outline-none focus:border-foreground/40"
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <button
+                  type="submit"
+                  disabled={chaosDispatching}
+                  className="w-full py-1.5 px-3 rounded text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {chaosDispatching ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Flame className="h-3.5 w-3.5" />}
+                  <span>{chaosDispatching ? "Dispatching..." : "Fire Synthetic Attack"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted flex items-center justify-between">
+                <span>Optional Custom Payload String (Leave blank for default OWASP vector)</span>
+                <span className="text-[10px] text-muted">Pipeline Validator &bull; Non-destructive</span>
+              </label>
+              <input
+                type="text"
+                value={chaosCustomString}
+                onChange={(e) => setChaosCustomString(e.target.value)}
+                placeholder="e.g. ' OR 1=1 -- or <script>steal()</script> or custom base64 string"
+                className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-mono text-foreground focus:outline-none focus:border-foreground/40"
+              />
+            </div>
+          </form>
+
+          {chaosResult && (
+            <div className="p-3 rounded-lg border border-card-border bg-background/50 font-mono text-xs space-y-2 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-card-border/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${chaosResult.detection.threat_detected ? "bg-emerald-400" : "bg-amber-400"}`} />
+                  <span className="font-semibold text-foreground">Pipeline Validation Output:</span>
+                  <span className="text-muted">{chaosResult.event_id}</span>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  chaosResult.detection.severity === "CRITICAL" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
+                  chaosResult.detection.severity === "HIGH" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                  "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                }`}>
+                  {chaosResult.detection.severity} SEVERITY
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                <div className="p-2 rounded bg-card border border-card-border">
+                  <span className="text-muted block text-[10px]">Heuristic Detection</span>
+                  <span className={`font-semibold ${chaosResult.detection.threat_detected ? "text-emerald-400" : "text-rose-400"}`}>
+                    {chaosResult.detection.threat_detected ? "✓ Exploit Flagged" : "✗ Evaded Detection"}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-card border border-card-border">
+                  <span className="text-muted block text-[10px]">Shannon Entropy</span>
+                  <span className="font-semibold text-foreground">{chaosResult.detection.payload_entropy} bits/symbol</span>
+                </div>
+                <div className="p-2 rounded bg-card border border-card-border">
+                  <span className="text-muted block text-[10px]">Identified Categories</span>
+                  <span className="font-semibold text-foreground truncate block">
+                    {chaosResult.detection.categories.join(", ") || "ANOMALY"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-muted flex items-center justify-between pt-1">
+                <span className="truncate pr-4">Payload: <code className="text-foreground">{chaosResult.dispatched_payload}</code></span>
+                <span className="shrink-0 text-emerald-400 font-medium">✓ Event synced into incident stream</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── 4. UNIFIED 4-CARD SRE TELEMETRY STRIP ── */}
       {sreData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -502,6 +677,7 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
             { id: "ALL", label: `All (${threats.length})` },
             { id: "CRITICAL", label: `Critical (${criticalCount})` },
             { id: "HIGH_ENTROPY", label: `High Entropy (${highEntropyCount})` },
+            { id: "DOM_TAMPERING", label: "DOM Tampering" },
             { id: "SQL_INJECTION", label: "SQL Injection" },
             { id: "XSS_ATTACK", label: "XSS" },
             { id: "PATH_TRAVERSAL", label: "Traversal" },
