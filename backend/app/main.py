@@ -98,3 +98,13 @@ app.include_router(ai_security_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+def prometheus_metrics():
+    """Prometheus SRE exposition endpoint for Grafana, Datadog, and VictoriaMetrics scrapers."""
+    from app.services.metrics_service import generate_prometheus_metrics_text
+    return Response(
+        content=generate_prometheus_metrics_text(),
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )

@@ -81,6 +81,7 @@ export default function DashboardLayout({
         email={userEmail}
         plan={plan}
         limit={limit}
+        siteId={siteId}
         onManageBilling={async () => {
           try {
             const res = await createPortalSession();

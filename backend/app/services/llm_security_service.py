@@ -94,6 +94,14 @@ def generate_llm_incident_report(incident_data: Dict[str, Any]) -> Dict[str, Any
         analysis = f"Path Traversal exploit detected on path '{path}'. Attacker attempted relative directory climbing ('../') to read sensitive OS files."
         waf_suggestion = f"SecRule REQUEST_URI \"@rx \\.\\./\" \"id:1003,phase:2,deny,status:403,msg:'Path Traversal Blocked'\""
         code_recommendation = "Use os.path.basename() or sanitize file paths against absolute filesystem root resolution before reading files."
+    elif "SSRF_ATTACK" in threat_type:
+        analysis = f"Server-Side Request Forgery (SSRF) probe detected targeting '{path}'. Attacker attempted to reach internal cloud metadata (169.254.169.254) or private RFC-1918 interfaces."
+        waf_suggestion = "SecRule ARGS \"@rx (?i)(169\\.254|metadata\\.google|localhost)\" \"id:1004,phase:2,deny,status:403,msg:'SSRF Exploit Blocked'\""
+        code_recommendation = "Validate and whitelist destination hostnames before performing HTTP dispatch. Block private IP ranges (127.0.0.0/8, 10.0.0.0/8, 169.254.0.0/16)."
+    elif "COMMAND_INJECTION" in threat_type or "REMOTE_CODE_EXECUTION" in threat_type:
+        analysis = f"Remote Code / Command Injection exploit attempt identified on '{path}'. Attacker injected shell delimiters or execution primitives to spawn commands on the host."
+        waf_suggestion = "SecRule ARGS \"@rx (?i)(;|\\||`|eval\\(|base64_decode)\" \"id:1005,phase:2,deny,status:403,msg:'RCE Command Injection Blocked'\""
+        code_recommendation = "Never invoke shell execution primitives (subprocess.Popen(shell=True), eval, exec). Pass explicit argument arrays with non-root user execution."
     else:
         analysis = f"Suspicious traffic anomaly detected with high entropy on path '{path}'. Automated bot or exploratory scanner."
         waf_suggestion = "Enforce rate limiting threshold (60 req/min) and turn on Cloudflare Bot Management Challenge Mode."

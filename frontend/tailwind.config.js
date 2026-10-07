@@ -1,6 +1,7 @@
 
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -17,6 +18,9 @@ export default {
         danger: 'var(--danger)',
         success: 'var(--success)',
         'border-subtle': 'var(--border-subtle)',
+        'code-bg': 'var(--code-bg)',
+        'code-border': 'var(--code-border)',
+        'modal-bg': 'var(--modal-bg)',
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out forwards',

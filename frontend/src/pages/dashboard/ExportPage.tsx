@@ -1,11 +1,11 @@
-import { useParams } from 'react-router-dom';
+import { useParams } from "react-router-dom";
 import { useState } from "react";
 import { fetchPages, fetchReferrers, fetchDevices, fetchCustomEvents, fetchTimeseries } from "@/lib/api";
-import { Download, FileSpreadsheet, FileJson, Calendar } from "lucide-react";
+import { Download, FileSpreadsheet, FileJson, Calendar, Database } from "lucide-react";
 import Toast from "@/components/Toast";
 
 export default function ExportPage() {
-  const {  siteId  } = useParams();
+  const { siteId } = useParams();
   const [days, setDays] = useState(30);
   const [exporting, setExporting] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -41,19 +41,19 @@ export default function ExportPage() {
       let headers: string[] = [];
 
       if (type === "pages") {
-        data = await fetchPages(siteId as string as string, days);
+        data = await fetchPages(siteId!, days);
         headers = ["Path", "Pageviews"];
       } else if (type === "referrers") {
-        data = await fetchReferrers(siteId as string as string, days);
+        data = await fetchReferrers(siteId!, days);
         headers = ["Referrer Source", "Pageviews"];
       } else if (type === "devices") {
-        data = await fetchDevices(siteId as string as string, days);
+        data = await fetchDevices(siteId!, days);
         headers = ["Device Type", "Pageviews"];
       } else if (type === "events") {
-        data = await fetchCustomEvents(siteId as string as string, days);
+        data = await fetchCustomEvents(siteId!, days);
         headers = ["Event Name", "Total Count", "Unique Visitors"];
       } else if (type === "timeseries") {
-        data = await fetchTimeseries(siteId as string as string, days);
+        data = await fetchTimeseries(siteId!, days);
         headers = ["Date", "Pageviews", "Visitors"];
       }
 
@@ -73,74 +73,76 @@ export default function ExportPage() {
   };
 
   return (
-    <div className="max-w-5xl animate-fade-in space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Export Analytics Data</h1>
-        <p className="text-xs text-muted mt-1">
-          Download your website's raw telemetry and aggregated reports in CSV or JSON format.
-        </p>
-      </div>
-
-      {/* Date Range Selector */}
-      <div className="rounded-xl border border-card-border bg-card p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-          <Calendar className="h-4 w-4 text-muted" />
-          <span>Select Time Period:</span>
+    <div className="space-y-5">
+      {/* Top Header Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-card-border">
+        <div>
+          <div className="flex items-center gap-2">
+            <Database className="h-4 w-4 text-muted" />
+            <h1 className="text-sm font-semibold tracking-tight text-foreground uppercase">
+              Telemetry Export & Schema Dumps
+            </h1>
+          </div>
+          <p className="text-xs text-muted mt-0.5">
+            Extract raw and aggregated telemetry data tables formatted for SIEM pipelines, pandas, or warehouse ingests.
+          </p>
         </div>
-        <div className="flex rounded-md border border-card-border overflow-hidden">
-          {[7, 14, 30, 90].map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                days === d
-                  ? "bg-foreground text-background font-semibold"
-                  : "text-muted hover:bg-white/5 hover:text-foreground"
-              }`}
-            >
-              Last {d} Days
-            </button>
-          ))}
+
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border border-card-border overflow-hidden bg-card">
+            {[7, 14, 30, 90].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                  days === d
+                    ? "bg-foreground text-background font-semibold"
+                    : "text-muted hover:bg-foreground/[0.04] hover:text-foreground"
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Export Options Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Top Pages */}
-        <div className="rounded-xl border border-card-border bg-card p-5 flex flex-col justify-between">
+        <div className="rounded-lg border border-card-border bg-card p-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm text-foreground">Top Pages & Paths</h3>
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="font-semibold text-xs text-foreground uppercase tracking-wider">Top Routes &amp; Endpoints</h3>
               <FileSpreadsheet className="h-4 w-4 text-muted" />
             </div>
             <p className="text-xs text-muted mb-4 leading-relaxed">
-              Export page breakdown including path URLs and total pageviews.
+              Export page breakdown including URI path strings and aggregated hit volumes.
             </p>
           </div>
           <div className="flex gap-2">
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("pages", "csv")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" /> CSV
+              <Download className="h-3 w-3" /> CSV
             </button>
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("pages", "json")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <FileJson className="h-3.5 w-3.5" /> JSON
+              <FileJson className="h-3 w-3" /> JSON
             </button>
           </div>
         </div>
 
         {/* Traffic Sources */}
-        <div className="rounded-xl border border-card-border bg-card p-5 flex flex-col justify-between">
+        <div className="rounded-lg border border-card-border bg-card p-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm text-foreground">Traffic Sources</h3>
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="font-semibold text-xs text-foreground uppercase tracking-wider">Referral Origins</h3>
               <FileSpreadsheet className="h-4 w-4 text-muted" />
             </div>
             <p className="text-xs text-muted mb-4 leading-relaxed">
@@ -151,25 +153,25 @@ export default function ExportPage() {
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("referrers", "csv")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" /> CSV
+              <Download className="h-3 w-3" /> CSV
             </button>
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("referrers", "json")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <FileJson className="h-3.5 w-3.5" /> JSON
+              <FileJson className="h-3 w-3" /> JSON
             </button>
           </div>
         </div>
 
         {/* Timeseries */}
-        <div className="rounded-xl border border-card-border bg-card p-5 flex flex-col justify-between">
+        <div className="rounded-lg border border-card-border bg-card p-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm text-foreground">Traffic Timeseries</h3>
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="font-semibold text-xs text-foreground uppercase tracking-wider">Timeseries Telemetry</h3>
               <FileSpreadsheet className="h-4 w-4 text-muted" />
             </div>
             <p className="text-xs text-muted mb-4 leading-relaxed">
@@ -180,25 +182,25 @@ export default function ExportPage() {
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("timeseries", "csv")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" /> CSV
+              <Download className="h-3 w-3" /> CSV
             </button>
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("timeseries", "json")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <FileJson className="h-3.5 w-3.5" /> JSON
+              <FileJson className="h-3 w-3" /> JSON
             </button>
           </div>
         </div>
 
         {/* Custom Events */}
-        <div className="rounded-xl border border-card-border bg-card p-5 flex flex-col justify-between">
+        <div className="rounded-lg border border-card-border bg-card p-4 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm text-foreground">Conversion Goals & Events</h3>
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="font-semibold text-xs text-foreground uppercase tracking-wider">Conversion Goals &amp; Events</h3>
               <FileSpreadsheet className="h-4 w-4 text-muted" />
             </div>
             <p className="text-xs text-muted mb-4 leading-relaxed">
@@ -209,16 +211,16 @@ export default function ExportPage() {
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("events", "csv")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <Download className="h-3.5 w-3.5" /> CSV
+              <Download className="h-3 w-3" /> CSV
             </button>
             <button
               disabled={exporting !== null}
               onClick={() => handleExport("events", "json")}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-card-border bg-background text-xs font-medium text-foreground hover:bg-white/5 cursor-pointer transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded border border-card-border bg-background text-xs font-mono font-medium text-foreground hover:bg-foreground/[0.04] cursor-pointer transition-colors disabled:opacity-50"
             >
-              <FileJson className="h-3.5 w-3.5" /> JSON
+              <FileJson className="h-3 w-3" /> JSON
             </button>
           </div>
         </div>

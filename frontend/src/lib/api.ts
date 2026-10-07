@@ -335,3 +335,110 @@ export async function fetchFunnelAnalysis(funnelId: number, days: number = 30) {
   return apiFetch<FunnelAnalysis>(`/api/v1/funnels/${funnelId}/analysis?days=${days}`);
 }
 
+// ---------------------------------------------------------------------------
+// Cyber Threat & AI Security Engine API
+// ---------------------------------------------------------------------------
+
+export interface CyberThreatIncident {
+  event_id: string;
+  timestamp: number;
+  site_id: string;
+  ip: string;
+  path: string;
+  threat_type: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  threat_score: number;
+  entropy: number;
+  raw_target: string;
+}
+
+export interface LLMIncidentReport {
+  attack_mechanism: string;
+  waf_rule: string;
+  code_fix: string;
+  ai_engine?: string;
+}
+
+export interface NLQueryResult {
+  user_query: string;
+  site_id: string;
+  interpreted_intent: string;
+  result_count: number;
+  telemetry_data: Record<string, unknown>[];
+  ai_summary: string;
+  recommended_action: string;
+}
+
+export async function getCyberThreats(siteId: string, limit: number = 50) {
+  return apiFetch<CyberThreatIncident[]>(`/api/v1/ai-security/threats?site_id=${siteId}&limit=${limit}`);
+}
+
+export async function analyzeThreatWithLLM(payload: {
+  path: string;
+  threat_type: string;
+  severity: string;
+  raw_target: string;
+  event_id?: string;
+}) {
+  return apiFetch<LLMIncidentReport>("/api/v1/ai-security/llm-analyze", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function queryTelemetryWithNL(siteId: string, query: string) {
+  return apiFetch<NLQueryResult>("/api/v1/ai-security/nl-query", {
+    method: "POST",
+    body: JSON.stringify({ site_id: siteId, query }),
+  });
+}
+
+export async function simulateCyberThreats(siteId: string) {
+  return apiFetch<{ status: string; message: string; simulated_count: number }>("/api/v1/ai-security/simulate", {
+    method: "POST",
+    body: JSON.stringify({ site_id: siteId }),
+  });
+}
+
+export interface SreTelemetryData {
+  status: string;
+  uptime_seconds: number;
+  cache_hit_ratio_percent: number;
+  l1_memory_hits: number;
+  l2_redis_hits: number;
+  cache_misses: number;
+  avg_ingestion_latency_ms: number;
+  estimated_p95_latency_ms: number;
+  total_threats_flagged: number;
+  webhooks_delivered: number;
+  stream_consumer_group: string;
+  batch_buffer_size: number;
+}
+
+export async function getSreTelemetry() {
+  return apiFetch<SreTelemetryData>("/api/v1/ai-security/sre-metrics");
+}
+
+export async function testSecurityWebhook(siteId: string, webhookUrl: string, incidentType: string = "SQL_INJECTION") {
+  return apiFetch<{
+    status: string;
+    status_code?: number;
+    delivery_id?: string;
+    signature_generated?: string;
+    error?: string;
+    detail?: string;
+  }>("/api/v1/ai-security/webhook/test", {
+    method: "POST",
+    body: JSON.stringify({ site_id: siteId, webhook_url: webhookUrl, incident_type: incidentType }),
+  });
+}
+
+export async function fetchRawPrometheusMetrics(): Promise<string> {
+  const res = await fetch(`${API_URL}/metrics`);
+  if (!res.ok) throw new Error("Failed to load Prometheus metrics");
+  return res.text();
+}
+
+export { API_URL };
+
+

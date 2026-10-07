@@ -29,6 +29,14 @@ THREAT_PATTERNS = {
         r"(;\s*(cat|ls|pwd|whoami|curl|wget|nc|bash|sh|cmd|powershell))",
         r"(\|\s*(cat|ls|whoami|bash))",
         r"(`.*`)"
+    ],
+    "SSRF_ATTACK": [
+        r"(?i)(169\.254\.169\.254|metadata\.google|127\.0\.0\.1|localhost)",
+        r"(?i)(gopher://|dict://|file://|ftp://)"
+    ],
+    "REMOTE_CODE_EXECUTION": [
+        r"(?i)(eval\s*\(|base64_decode\s*\(|system\s*\(|passthru\s*\()",
+        r"(?i)(python\s*-c|perl\s*-e|php\s*-r)"
     ]
 }
 

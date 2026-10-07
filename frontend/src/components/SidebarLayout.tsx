@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3, FileText, Globe, Zap, Code, MousePointer2,
-  Megaphone, Download, ChevronLeft, ChevronRight, ArrowLeft, Filter,
+  ChevronLeft, ChevronRight, ArrowLeft, Filter,
+  ShieldAlert,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import UserDropdown from "@/components/UserDropdown";
+import SnippetModal from "@/components/SnippetModal";
 
 interface SidebarLayoutProps {
   siteId: string;
@@ -24,14 +26,12 @@ interface SidebarLayoutProps {
 
 const NAV_ITEMS = [
   { key: "overview",  label: "Overview",        icon: BarChart3,     path: "" },
+  { key: "security",  label: "Threat Engine",   icon: ShieldAlert,   path: "/security" },
   { key: "funnels",   label: "Funnels",         icon: Filter,        path: "/funnels" },
   { key: "pages",     label: "Pages",            icon: FileText,      path: "/pages" },
   { key: "sources",   label: "Sources",          icon: Globe,         path: "/sources" },
-  { key: "campaigns", label: "Campaigns",        icon: Megaphone,     path: "/campaigns" },
   { key: "events",    label: "Events & Goals",   icon: Zap,           path: "/events" },
   { key: "replays",   label: "Session Replays",  icon: MousePointer2, path: "/replays" },
-  { key: "snippet",   label: "Snippet",          icon: Code,          path: "/snippet" },
-  { key: "export",    label: "Export",           icon: Download,      path: "/export" },
 ];
 
 export default function SidebarLayout({
@@ -50,6 +50,7 @@ export default function SidebarLayout({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [showSnippetModal, setShowSnippetModal] = useState(false);
 
   const basePath = `/dashboard/${siteId}`;
 
@@ -112,8 +113,8 @@ export default function SidebarLayout({
                 title={collapsed ? item.label : undefined}
                 className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer ${
                   isActive
-                    ? "bg-foreground/[0.09] text-foreground"
-                    : "text-muted hover:bg-white/[0.04] hover:text-foreground"
+                    ? "bg-foreground/[0.09] text-foreground font-semibold"
+                    : "text-muted hover:bg-foreground/[0.04] hover:text-foreground"
                 } ${collapsed ? "justify-center px-0" : ""}`}
               >
                 <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-foreground" : "text-muted"}`} />
@@ -128,7 +129,7 @@ export default function SidebarLayout({
           <button
             onClick={() => navigate("/sites")}
             title="All Sites"
-            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted hover:bg-white/[0.04] hover:text-foreground transition-colors cursor-pointer ${collapsed ? "justify-center" : ""}`}
+            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12px] font-medium text-muted hover:bg-foreground/[0.04] hover:text-foreground transition-colors cursor-pointer ${collapsed ? "justify-center" : ""}`}
           >
             <ArrowLeft className="h-3.5 w-3.5 flex-shrink-0" />
             {!collapsed && <span>All Sites</span>}
@@ -139,7 +140,7 @@ export default function SidebarLayout({
       {/* ── MAIN CONTENT ────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar — single, clean row: left=site breadcrumb, right=controls */}
-        <header className="flex items-center justify-between px-6 border-b border-card-border min-h-[56px] bg-background/80 backdrop-blur-sm">
+        <header className="relative z-30 flex items-center justify-between px-6 border-b border-card-border min-h-[56px] bg-background/95 backdrop-blur-md">
           {/* LEFT: Home ← / SiteName breadcrumb — no logo repeat */}
           <div className="flex items-center gap-1.5">
             <button
@@ -152,14 +153,22 @@ export default function SidebarLayout({
             <span className="text-muted/30 text-sm">/</span>
             <button
               onClick={() => navigate(basePath)}
-              className="text-foreground font-semibold text-sm cursor-pointer hover:text-accent transition-colors truncate max-w-[200px]"
+              className="text-foreground font-semibold text-sm cursor-pointer hover:text-foreground/80 transition-colors truncate max-w-[200px]"
             >
               {siteName || siteId}
             </button>
           </div>
 
-          {/* RIGHT: Theme toggle + user dropdown — always vertically centered */}
+          {/* RIGHT: Tracking Code + Theme toggle + user dropdown */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSnippetModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-card-border bg-foreground/[0.03] hover:bg-foreground/[0.07] text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer"
+              title="Install Tracking Code"
+            >
+              <Code className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tracking Code</span>
+            </button>
             <ThemeToggle />
             <UserDropdown
               email={userEmail}
@@ -178,6 +187,15 @@ export default function SidebarLayout({
           {children}
         </div>
       </main>
+
+      {/* Tracking Code Setup Modal */}
+      <SnippetModal
+        isOpen={showSnippetModal}
+        onClose={() => setShowSnippetModal(false)}
+        siteId={siteId}
+        siteName={siteName}
+        siteDomain={siteDomain}
+      />
     </div>
   );
 }

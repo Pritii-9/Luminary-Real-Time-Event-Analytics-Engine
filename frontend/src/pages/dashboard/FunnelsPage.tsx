@@ -7,7 +7,6 @@ import {
   TrendingDown,
   Users,
   CheckCircle2,
-  AlertCircle,
   BarChart2,
   X,
 } from "lucide-react";
@@ -130,31 +129,33 @@ export default function FunnelsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Top Header Row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-card-border">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Filter className="h-5 w-5 text-primary" />
-            Conversion Funnels & Drop-off Analysis
-          </h1>
-          <p className="text-xs text-muted mt-1">
-            Track multi-step visitor journeys and pinpoint exact conversion drop-off percentages.
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted" />
+            <h1 className="text-sm font-semibold tracking-tight text-foreground uppercase">
+              Pipeline Funnels & Drop-off Telemetry
+            </h1>
+          </div>
+          <p className="text-xs text-muted mt-0.5">
+            Multi-stage visitor journeys, transition retention, and bottleneck drop-off analysis.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Timeframe Selector */}
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="px-3 py-1.5 rounded-lg border border-card-border bg-card text-xs font-medium text-foreground focus:outline-none"
+            className="px-2.5 py-1.5 rounded-md border border-card-border bg-card text-xs font-medium text-foreground focus:outline-none cursor-pointer"
           >
             <option value={7}>Last 7 Days</option>
             <option value={14}>Last 14 Days</option>
@@ -165,9 +166,9 @@ export default function FunnelsPage() {
           {/* New Funnel Button */}
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+            className="flex items-center gap-1.5 bg-foreground text-background text-xs font-semibold px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3.5 w-3.5" />
             New Funnel
           </button>
         </div>
@@ -175,146 +176,156 @@ export default function FunnelsPage() {
 
       {/* Main Content Layout */}
       {funnels.length === 0 ? (
-        <div className="border border-dashed border-card-border rounded-xl p-12 text-center bg-card/20">
-          <Filter className="h-10 w-10 text-muted mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-foreground">No Conversion Funnels Created</h3>
+        <div className="border border-dashed border-card-border rounded-lg p-12 text-center bg-card">
+          <Filter className="h-8 w-8 text-muted mx-auto mb-3 stroke-[1.5]" />
+          <h3 className="text-sm font-medium text-foreground">No Conversion Funnels Defined</h3>
           <p className="text-xs text-muted max-w-sm mx-auto mt-1 mb-4">
-            Build user journey funnels (e.g. Landing &rarr; Pricing &rarr; Register) to analyze conversion retention.
+            Build step pipelines (e.g. Landing &rarr; Pricing &rarr; Register) to monitor step-by-step conversion drop-offs.
           </p>
           <button
             onClick={() => setShowModal(true)}
-            className="bg-primary text-primary-foreground text-xs font-medium px-4 py-2 rounded-lg cursor-pointer"
+            className="bg-foreground text-background text-xs font-semibold px-3.5 py-1.5 rounded-md hover:opacity-90 transition-opacity cursor-pointer"
           >
-            Create Your First Funnel
+            Create First Funnel
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Funnel Selector List */}
           <div className="lg:col-span-1 space-y-2">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Funnels</p>
-            {funnels.map((f) => {
-              const isSelected = f.id === selectedFunnelId;
-              return (
-                <div
-                  key={f.id}
-                  onClick={() => setSelectedFunnelId(f.id)}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                    isSelected
-                      ? "border-primary bg-primary/5 text-foreground font-semibold"
-                      : "border-card-border bg-card/40 text-muted hover:text-foreground hover:bg-card/70"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1 pr-2">
-                    <p className="text-xs truncate">{f.name}</p>
-                    <p className="text-[10px] text-muted truncate mt-0.5">
-                      {f.steps.length} Steps
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteFunnel(f.id);
-                    }}
-                    title="Delete Funnel"
-                    className="text-muted hover:text-red-400 p-1 rounded-md transition-colors"
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] font-medium text-muted uppercase tracking-wider">Pipelines</span>
+              <span className="text-[10px] font-mono text-muted">{funnels.length} active</span>
+            </div>
+            <div className="space-y-1.5">
+              {funnels.map((f) => {
+                const isSelected = f.id === selectedFunnelId;
+                return (
+                  <div
+                    key={f.id}
+                    onClick={() => setSelectedFunnelId(f.id)}
+                    className={`p-2.5 rounded-md border text-left transition-colors cursor-pointer flex items-center justify-between ${
+                      isSelected
+                        ? "border-foreground/30 bg-foreground/[0.04] text-foreground font-medium"
+                        : "border-card-border bg-card text-muted hover:text-foreground hover:bg-foreground/[0.02]"
+                    }`}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="min-w-0 flex-1 pr-2">
+                      <p className="text-xs font-medium truncate">{f.name}</p>
+                      <p className="text-[10px] text-muted font-mono mt-0.5">
+                        {f.steps.length} stages
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteFunnel(f.id);
+                      }}
+                      title="Delete Funnel"
+                      className="text-muted hover:text-rose-400 p-1 rounded transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Funnel Visualizer Panel */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-4">
             {analyzing ? (
-              <div className="flex h-64 items-center justify-center border border-card-border rounded-xl bg-card/40">
-                <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              <div className="flex h-64 items-center justify-center border border-card-border rounded-lg bg-card">
+                <div className="h-5 w-5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin" />
               </div>
             ) : analysis ? (
               <>
                 {/* Summary Metrics Cards */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl border border-card-border bg-card/40">
-                    <div className="flex items-center gap-2 text-muted text-xs mb-1">
-                      <Users className="h-3.5 w-3.5 text-blue-400" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-lg border border-card-border bg-card">
+                    <div className="flex items-center justify-between text-muted text-[10px] font-medium uppercase tracking-wider mb-1">
                       <span>Total Entrants</span>
+                      <Users className="h-3.5 w-3.5 text-muted" />
                     </div>
-                    <p className="text-lg font-bold">{analysis.total_entrants}</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground">{analysis.total_entrants.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted mt-0.5 font-mono">Stage 1 triggers</p>
                   </div>
 
-                  <div className="p-4 rounded-xl border border-card-border bg-card/40">
-                    <div className="flex items-center gap-2 text-muted text-xs mb-1">
+                  <div className="p-3.5 rounded-lg border border-card-border bg-card">
+                    <div className="flex items-center justify-between text-muted text-[10px] font-medium uppercase tracking-wider mb-1">
+                      <span>Completed</span>
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Conversions</span>
                     </div>
-                    <p className="text-lg font-bold">{analysis.total_conversions}</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground">{analysis.total_conversions.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted mt-0.5 font-mono">Full pipeline completed</p>
                   </div>
 
-                  <div className="p-4 rounded-xl border border-card-border bg-card/40">
-                    <div className="flex items-center gap-2 text-muted text-xs mb-1">
-                      <BarChart2 className="h-3.5 w-3.5 text-purple-400" />
-                      <span>Overall Rate</span>
+                  <div className="p-3.5 rounded-lg border border-card-border bg-card">
+                    <div className="flex items-center justify-between text-muted text-[10px] font-medium uppercase tracking-wider mb-1">
+                      <span>Net Conversion</span>
+                      <BarChart2 className="h-3.5 w-3.5 text-muted" />
                     </div>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-lg font-semibold tabular-nums text-foreground">
                       {analysis.overall_conversion_rate}
                     </p>
+                    <p className="text-[10px] text-muted mt-0.5 font-mono">End-to-end retention</p>
                   </div>
                 </div>
 
                 {/* Step Breakdown Cards */}
-                <div className="border border-card-border rounded-xl p-5 bg-card/40 space-y-5">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center justify-between">
-                    <span>{analysis.name} — Step Breakdown</span>
-                    <span className="text-xs font-normal text-muted">
-                      Timeframe: Last {days} Days
+                <div className="border border-card-border rounded-lg bg-card overflow-hidden">
+                  <div className="p-3.5 border-b border-card-border flex items-center justify-between bg-foreground/[0.01]">
+                    <span className="text-xs font-semibold text-foreground tracking-tight">
+                      {analysis.name} — Pipeline Stages
                     </span>
-                  </h3>
+                    <span className="text-[10px] font-mono text-muted">
+                      Window: Last {days} Days
+                    </span>
+                  </div>
 
-                  <div className="space-y-4">
+                  <div className="p-4 space-y-4">
                     {analysis.step_analysis.map((step, idx) => {
-                      const widthPct = Math.max(
-                        Number(step.retention_rate.replace("%", "")),
-                        5
-                      );
+                      const numericPct = Number(step.retention_rate.replace("%", "")) || 0;
+                      const widthPct = Math.max(Math.min(numericPct, 100), 4);
 
                       return (
-                        <div key={idx} className="space-y-1.5">
+                        <div key={idx} className="space-y-1.5 p-3 rounded-md border border-border-subtle bg-foreground/[0.01]">
                           <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 font-medium">
-                              <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center">
+                            <div className="flex items-center gap-2">
+                              <span className="h-5 w-5 rounded font-mono text-[10px] font-semibold border border-card-border bg-foreground/[0.05] text-foreground flex items-center justify-center">
                                 {step.step_number}
                               </span>
-                              <span>{step.name}</span>
-                              <span className="text-muted text-[11px]">({step.path})</span>
+                              <span className="font-medium text-foreground">{step.name}</span>
+                              <span className="text-muted font-mono text-[11px]">{step.path}</span>
                             </div>
 
-                            <div className="flex items-center gap-4 text-xs">
-                              <span className="font-semibold text-foreground">
-                                {step.visitors} visitors
+                            <div className="flex items-center gap-3 text-xs tabular-nums">
+                              <span className="text-muted">
+                                <strong className="text-foreground font-semibold">{step.visitors.toLocaleString()}</strong> visitors
                               </span>
-                              <span className="text-emerald-400 font-bold">
+                              <span className="font-mono font-medium px-2 py-0.5 rounded text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 {step.retention_rate}
                               </span>
                             </div>
                           </div>
 
                           {/* Progress Bar Container */}
-                          <div className="h-3 w-full bg-zinc-800/60 rounded-full overflow-hidden relative">
+                          <div className="h-2 w-full bg-foreground/[0.06] rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-primary to-purple-500 rounded-full transition-all duration-300"
+                              className="h-full bg-foreground/80 rounded-full transition-all duration-300"
                               style={{ width: `${widthPct}%` }}
                             />
                           </div>
 
                           {/* Drop-off Indicator (if not first step) */}
                           {idx > 0 && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-red-400 bg-red-500/10 px-2.5 py-1 rounded-md w-fit">
-                              <TrendingDown className="h-3 w-3" />
-                              <span>
-                                Drop-off: <strong>-{step.dropoff_count}</strong> visitors ({step.dropoff_rate})
-                              </span>
+                            <div className="flex items-center justify-between text-[11px] pt-0.5">
+                              <div className="flex items-center gap-1.5 text-rose-400 font-mono">
+                                <TrendingDown className="h-3 w-3" />
+                                <span>
+                                  Stage Drop-off: -{step.dropoff_count.toLocaleString()} visitors ({step.dropoff_rate})
+                                </span>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -330,13 +341,16 @@ export default function FunnelsPage() {
 
       {/* Modal: Create Funnel */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-card-border rounded-xl w-full max-w-md p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-foreground">Create Conversion Funnel</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-card border border-card-border rounded-lg w-full max-w-md p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-card-border">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Create Conversion Pipeline</h3>
+                <p className="text-[11px] text-muted mt-0.5">Define sequential paths to compute conversion drop-offs</p>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-muted hover:text-foreground transition-colors cursor-pointer"
+                className="text-muted hover:text-foreground transition-colors p-1 rounded-md"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -344,78 +358,82 @@ export default function FunnelsPage() {
 
             <form onSubmit={handleCreateFunnel} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-muted mb-1">
-                  Funnel Name
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Pipeline Name
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., User Onboarding & Checkout"
+                  placeholder="e.g., Onboarding to Subscription"
                   value={funnelName}
                   onChange={(e) => setFunnelName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-card-border bg-background text-xs font-medium focus:outline-none focus:border-primary"
+                  className="w-full px-3 py-1.5 rounded-md border border-card-border bg-background text-xs font-medium text-foreground placeholder:text-muted/60 focus:outline-none focus:border-foreground/40"
                 />
               </div>
 
               {/* Step Fields */}
-              <div className="space-y-3">
-                <label className="block text-xs font-medium text-muted">
-                  Funnel Steps (Min 2)
-                </label>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">
+                    Sequential Stages (Min 2)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addStepField}
+                    className="text-[11px] font-medium text-foreground hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" /> Add Stage
+                  </button>
+                </div>
 
-                {steps.map((step, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder={`Step ${idx + 1} Name`}
-                      value={step.name}
-                      onChange={(e) => updateStepField(idx, "name", e.target.value)}
-                      className="w-1/2 px-2.5 py-1.5 rounded-lg border border-card-border bg-background text-xs font-medium focus:outline-none"
-                    />
-                    <input
-                      type="text"
-                      required
-                      placeholder="URL Path (/pricing)"
-                      value={step.path}
-                      onChange={(e) => updateStepField(idx, "path", e.target.value)}
-                      className="w-1/2 px-2.5 py-1.5 rounded-lg border border-card-border bg-background text-xs font-medium focus:outline-none"
-                    />
-                    {steps.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => removeStepField(idx)}
-                        className="text-muted hover:text-red-400 p-1"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={addStepField}
-                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer pt-1"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Step
-                </button>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {steps.map((step, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-muted w-4 text-center">{idx + 1}</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Stage ${idx + 1} Name`}
+                        value={step.name}
+                        onChange={(e) => updateStepField(idx, "name", e.target.value)}
+                        className="w-1/2 px-2.5 py-1.5 rounded-md border border-card-border bg-background text-xs font-medium text-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="/path"
+                        value={step.path}
+                        onChange={(e) => updateStepField(idx, "path", e.target.value)}
+                        className="w-1/2 px-2.5 py-1.5 rounded-md border border-card-border bg-background text-xs font-mono text-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                      {steps.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => removeStepField(idx)}
+                          className="text-muted hover:text-rose-400 p-1"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-card-border">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-card-border">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted hover:bg-white/5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-md text-xs font-medium text-muted hover:text-foreground hover:bg-foreground/[0.04] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
+                  className="px-4 py-1.5 rounded-md text-xs font-semibold bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
                 >
-                  {creating ? "Creating..." : "Save Funnel"}
+                  {creating ? "Creating..." : "Save Pipeline"}
                 </button>
               </div>
             </form>

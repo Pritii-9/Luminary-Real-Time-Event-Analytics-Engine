@@ -13,14 +13,16 @@
   --background: #09090b;       /* zinc-950 */
   --foreground: #e4e4e7;       /* zinc-200 (softer than pure white to reduce glare) */
   --card: #18181b;             /* zinc-900 */
-  --card-border: rgba(255, 255, 255, 0.06);
+  --card-border: rgba(255, 255, 255, 0.08);
   --accent: #a1a1aa;           /* zinc-400 — monochrome white accent */
   --accent-hover: #d4d4d8;    /* zinc-300 */
   --success: #4ade80;          /* green-400, muted */
   --muted: #71717a;            /* zinc-500 */
   --danger: #f87171;           /* red-400, muted */
-  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-subtle: rgba(255, 255, 255, 0.05);
   --modal-bg: #18181b;
+  --code-bg: #121215;
+  --code-border: rgba(255, 255, 255, 0.08);
 }
 
 /* Light mode */
@@ -28,14 +30,16 @@
   --background: #fafafa;       /* zinc-50 */
   --foreground: #27272a;       /* zinc-800 (softer than stark black) */
   --card: #ffffff;
-  --card-border: rgba(0, 0, 0, 0.06);
+  --card-border: rgba(0, 0, 0, 0.08);
   --accent: #3f3f46;           /* zinc-700 */
   --accent-hover: #27272a;    /* zinc-800 */
   --success: #16a34a;
   --muted: #71717a;
   --danger: #dc2626;
-  --border-subtle: rgba(0, 0, 0, 0.03);
+  --border-subtle: rgba(0, 0, 0, 0.04);
   --modal-bg: #ffffff;
+  --code-bg: #f4f4f5;          /* zinc-100 */
+  --code-border: rgba(0, 0, 0, 0.08);
 }
 
 

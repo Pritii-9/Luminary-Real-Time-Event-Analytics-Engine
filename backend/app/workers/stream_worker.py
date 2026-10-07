@@ -88,6 +88,15 @@ def process_messages(messages):
                 session.commit()
             print(f"[OK] Batch-inserted {len(db_records)} events into SQL Database.")
             redis_client.xack(STREAM_KEY, GROUP_NAME, *ack_ids)
+
+            # Invalidate cached analytics for affected sites
+            try:
+                from app.services.cache_service import invalidate_site_cache
+                affected_sites = set(r.site_id for r in db_records)
+                for sid in affected_sites:
+                    invalidate_site_cache(sid)
+            except Exception as cache_err:
+                print(f"Cache invalidation notice: {cache_err}")
         except Exception as e:
             print(f"SQL Database batch insert failed: {e}")
             raise

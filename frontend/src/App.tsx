@@ -14,6 +14,7 @@ import CampaignsPage from './pages/dashboard/CampaignsPage';
 import ReplaysPage from './pages/dashboard/ReplaysPage';
 import FunnelsPage from './pages/dashboard/FunnelsPage';
 import ExportPage from './pages/dashboard/ExportPage';
+import SecurityPage from './pages/dashboard/SecurityPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         
         <Route path="/dashboard/:siteId" element={<DashboardLayout />}>
           <Route index element={<DashboardHome />} />
+          <Route path="security" element={<SecurityPage />} />
           <Route path="funnels" element={<FunnelsPage />} />
           <Route path="snippet" element={<SnippetPage />} />
           <Route path="sources" element={<SourcesPage />} />

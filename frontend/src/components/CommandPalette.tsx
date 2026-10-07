@@ -2,7 +2,8 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search, BarChart3, Globe, Code, Plus, ExternalLink,
-  MousePointer2, Download, Megaphone, Zap, FileText, ArrowRight,
+  MousePointer2, Download, Zap, FileText, ArrowRight,
+  ShieldAlert, Filter,
 } from "lucide-react";
 import type { SiteData } from "@/lib/api";
 
@@ -20,13 +21,12 @@ const GLOBAL_ACTIONS = [
 
 const SITE_PAGES = [
   { key: "overview",  label: "Overview",       icon: BarChart3,    path: "" },
+  { key: "security",  label: "Threat Engine & AI Security", icon: ShieldAlert, path: "/security" },
+  { key: "funnels",   label: "Funnels & Conversions", icon: Filter, path: "/funnels" },
   { key: "pages",     label: "Pages",           icon: FileText,     path: "/pages" },
   { key: "sources",   label: "Sources",         icon: Globe,        path: "/sources" },
-  { key: "campaigns", label: "Campaigns",       icon: Megaphone,    path: "/campaigns" },
   { key: "events",    label: "Events & Goals",  icon: Zap,          path: "/events" },
   { key: "replays",   label: "Session Replays", icon: MousePointer2,path: "/replays" },
-  { key: "snippet",   label: "Snippet Setup",   icon: Code,         path: "/snippet" },
-  { key: "export",    label: "Export Data",     icon: Download,     path: "/export" },
 ];
 
 export default function CommandPalette({ open, onClose, sites, onAddSite }: CommandPaletteProps) {

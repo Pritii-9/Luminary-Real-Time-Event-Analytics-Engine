@@ -30,6 +30,11 @@ def get_cached(site_id: str, endpoint: str, days: int):
     if mem_entry:
         val, expires_at = mem_entry
         if time.time() < expires_at:
+            try:
+                from app.services.metrics_service import record_cache_hit
+                record_cache_hit("l1_memory")
+            except Exception:
+                pass
             return val
         else:
             del _memory_cache[key]
@@ -42,10 +47,21 @@ def get_cached(site_id: str, endpoint: str, days: int):
             if raw:
                 data = json.loads(raw)
                 _memory_cache[key] = (data, time.time() + 15)
+                try:
+                    from app.services.metrics_service import record_cache_hit
+                    record_cache_hit("l2_redis")
+                except Exception:
+                    pass
                 return data
         except Exception as e:
             _redis_disabled_until = time.time() + 30
             logging.debug(f"Cache read failed, disabling for 30s: {e}")
+
+    try:
+        from app.services.metrics_service import record_cache_miss
+        record_cache_miss()
+    except Exception:
+        pass
 
     return None
 

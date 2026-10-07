@@ -16,7 +16,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
-import { Eye, Users, Activity, Globe, FileText, Zap, AlertTriangle, ShieldCheck, TrendingUp, TrendingDown } from "lucide-react";
+import { Eye, Users, Activity, Globe, FileText, Zap, AlertTriangle, ShieldCheck, TrendingUp, TrendingDown, Download } from "lucide-react";
+import ExportModal from "@/components/ExportModal";
 
 const CHART_COLORS = ["#a1a1aa", "#71717a", "#52525b", "#3f3f46", "#27272a", "#d4d4d8", "#e4e4e7"];
 
@@ -33,6 +34,7 @@ export default function DashboardHome() {
   const [activeVisitors, setActiveVisitors] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     if (!getToken()) { navigate("/login"); return; }
@@ -93,31 +95,42 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="max-w-7xl animate-fade-in">
+    <div className="max-w-7xl animate-fade-in space-y-5">
       {/* Days filter + Live badge — full-width bar, same baseline */}
-      <div className="flex items-center justify-between mb-6">
-        {/* Left: date range pills */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted font-medium hidden sm:block">Range:</span>
-          <div className="flex rounded-md border border-card-border overflow-hidden">
-            {[7, 14, 30].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                  days === d
-                    ? "bg-foreground text-background font-semibold"
-                    : "text-muted hover:bg-white/5 hover:text-foreground"
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
+      <div className="flex items-center justify-between">
+        {/* Left: date range pills & Export button */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted font-medium hidden sm:block">Range:</span>
+            <div className="flex rounded-md border border-card-border overflow-hidden">
+              {[7, 14, 30].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                    days === d
+                      ? "bg-foreground text-background font-semibold"
+                      : "text-muted hover:bg-foreground/5 hover:text-foreground"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
           </div>
+
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-card-border bg-card hover:bg-foreground/[0.04] text-xs font-medium text-muted hover:text-foreground transition-colors cursor-pointer shadow-xs"
+            title="Export CSV or JSON analytics telemetry"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
         </div>
 
         {/* Right: live visitors pill */}
-        <div className="flex items-center gap-2 rounded-md border border-card-border bg-card px-3 py-1.5">
+        <div className="flex items-center gap-2 rounded-md border border-card-border bg-card px-3 py-1.5 shadow-xs">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success"></span>
@@ -185,7 +198,7 @@ export default function DashboardHome() {
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timeseries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                 <XAxis dataKey="event_date" stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
                 <YAxis stroke="var(--muted)" tick={{ fontSize: 10, fill: "var(--muted)" }} />
                 <Tooltip
@@ -197,8 +210,8 @@ export default function DashboardHome() {
                     fontSize: "11px",
                   }}
                 />
-                <Line type="monotone" dataKey="pageviews" stroke="#d4d4d8" strokeWidth={1.5} dot={{ r: 2.5, fill: "#d4d4d8" }} />
-                <Line type="monotone" dataKey="visitors" stroke="#71717a" strokeWidth={1.5} dot={{ r: 2, fill: "#71717a" }} />
+                <Line type="monotone" dataKey="pageviews" stroke="var(--foreground)" strokeWidth={1.5} dot={{ r: 2.5, fill: "var(--foreground)" }} />
+                <Line type="monotone" dataKey="visitors" stroke="var(--muted)" strokeWidth={1.5} dot={{ r: 2, fill: "var(--muted)" }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -254,8 +267,8 @@ export default function DashboardHome() {
           </div>
           <div className="divide-y divide-border-subtle">
             {pages.map((page: any, i: number) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
-                <span className="text-xs text-zinc-400 font-mono truncate max-w-[250px]">{page.path}</span>
+              <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-foreground/[0.02] transition-colors">
+                <span className="text-xs text-foreground font-mono truncate max-w-[250px]">{page.path}</span>
                 <span className="text-xs font-medium text-muted tabular-nums">{page.views}</span>
               </div>
             ))}
@@ -273,8 +286,8 @@ export default function DashboardHome() {
           </div>
           <div className="divide-y divide-border-subtle">
             {referrers.map((ref: any, i: number) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
-                <span className="text-xs text-zinc-400 truncate max-w-[250px]">{ref.referrer}</span>
+              <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-foreground/[0.02] transition-colors">
+                <span className="text-xs text-foreground truncate max-w-[250px]">{ref.referrer}</span>
                 <span className="text-xs font-medium text-muted tabular-nums">{ref.views}</span>
               </div>
             ))}
@@ -304,8 +317,8 @@ export default function DashboardHome() {
                 ? ((event.unique_visitors / summary.visitors) * 100).toFixed(1)
                 : "0.0";
               return (
-                <div key={i} className="grid grid-cols-12 gap-4 items-center px-4 py-3 hover:bg-white/[0.02] transition-colors">
-                  <span className="col-span-6 text-xs font-medium text-zinc-400 font-mono truncate">{event.event_name}</span>
+                <div key={i} className="grid grid-cols-12 gap-4 items-center px-4 py-3 hover:bg-foreground/[0.02] transition-colors">
+                  <span className="col-span-6 text-xs font-medium text-foreground font-mono truncate">{event.event_name}</span>
                   <span className="col-span-2 text-xs text-muted text-right tabular-nums">{event.count.toLocaleString()}</span>
                   <span className="col-span-2 text-xs text-muted text-right tabular-nums">{event.unique_visitors.toLocaleString()}</span>
                   <span className="col-span-2 text-xs font-medium text-foreground text-right tabular-nums">{convRate}%</span>
@@ -314,12 +327,20 @@ export default function DashboardHome() {
             })}
             {customEvents.length === 0 && (
               <div className="px-4 py-8 text-center text-xs text-muted">
-                No custom events yet. Use <code className="font-mono text-zinc-400 bg-white/[0.03] px-1.5 py-0.5 rounded">window.luminary.track("event_name")</code> to track goals.
+                No custom events yet. Use <code className="font-mono text-foreground bg-foreground/[0.05] border border-card-border px-1.5 py-0.5 rounded">window.luminary.track("event_name")</code> to track goals.
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Export Telemetry Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        siteId={siteId!}
+        defaultDays={days}
+      />
     </div>
   );
 }
@@ -336,9 +357,9 @@ function KpiCard({
   live?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-card-border bg-card p-4 hover:bg-white/[0.02] transition-colors">
+    <div className="rounded-lg border border-card-border bg-card p-4 hover:bg-foreground/[0.02] transition-colors">
       <div className="flex items-center justify-between mb-3">
-        <div className="rounded-md border border-card-border bg-white/[0.02] p-2 text-muted">
+        <div className="rounded-md border border-card-border bg-foreground/[0.03] p-2 text-muted">
           {icon}
         </div>
         {live && (
