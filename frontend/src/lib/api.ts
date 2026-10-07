@@ -454,6 +454,8 @@ export interface SreTelemetryData {
   estimated_p95_latency_ms: number;
   total_threats_flagged: number;
   webhooks_delivered: number;
+  active_jailed_ips?: number;
+  total_quarantined_lifetime?: number;
   stream_consumer_group: string;
   batch_buffer_size: number;
 }

@@ -113,7 +113,17 @@ async def collect(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    # 0. Rate limiting check (60 requests/min)
+    # 0. Active Defense Quarantine Check (< 2ms In-Memory Redis Jail)
+    from app.services.event_service import extract_client_ip
+    from app.services.quarantine_service import is_ip_quarantined, quarantine_ip
+    client_ip = extract_client_ip(request)
+    if await is_ip_quarantined(client_ip):
+        raise HTTPException(
+            status_code=403,
+            detail="403 Forbidden: Client IP quarantined by Luminary Automated Active Defense."
+        )
+
+    # 0.1 Rate limiting check (60 requests/min)
     if await is_rate_limited(request, "collect", limit=60, window_seconds=60):
         raise HTTPException(status_code=429, detail="Too many events sent. Please slow down.")
 
@@ -223,6 +233,18 @@ async def collect(
 
     # 5. Ingest event
     payload = enrich_event(event, request)
+
+    # Active Defense: Evaluate threat heuristics and auto-quarantine malicious actors
+    from app.services.cyber_threat_service import scan_payload_threats
+    threat_eval = scan_payload_threats(
+        url=str(event.url),
+        path=event.path or "/",
+        referrer=event.referrer or "",
+        user_agent=user_agent
+    )
+    if threat_eval["threat_detected"] and threat_eval["severity"] in ("CRITICAL", "HIGH"):
+        reason = f"{','.join(threat_eval['categories']) or 'ANOMALOUS_ATTACK'}:{threat_eval['severity']}"
+        background_tasks.add_task(quarantine_ip, client_ip, reason)
 
     # Publish to Redis Queue & update real-time stream (fail-open timeout)
     try:

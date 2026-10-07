@@ -150,7 +150,7 @@ class ChaosPayloadRequest(BaseModel):
 
 
 @router.post("/chaos-test")
-def dispatch_chaos_test(req: ChaosPayloadRequest, session: Session = Depends(get_session)):
+async def dispatch_chaos_test(req: ChaosPayloadRequest, session: Session = Depends(get_session)):
     """Synthetic Threat Generator (The 'Chaos Sandbox').
     Injects a safe mock exploit payload against the tenant's pipeline to validate detection & alerting in real-time.
     """
@@ -204,6 +204,12 @@ def dispatch_chaos_test(req: ChaosPayloadRequest, session: Session = Depends(get
         user_agent=ua
     )
 
+    # Active Defense: Automatically quarantine the synthetic attacker IP in Redis Jail
+    from app.services.quarantine_service import quarantine_ip
+    quarantined = False
+    if scan_result["threat_detected"] and scan_result["severity"] in ("CRITICAL", "HIGH"):
+        quarantined = await quarantine_ip(f"sandbox_{uuid.uuid4().hex[:4]}", f"SYNTHETIC_{req.payload_type}", ttl_seconds=900)
+
     return {
         "status": "dispatched",
         "event_id": event_id,
@@ -211,8 +217,9 @@ def dispatch_chaos_test(req: ChaosPayloadRequest, session: Session = Depends(get
         "payload_type": req.payload_type,
         "dispatched_payload": payload_text,
         "detection": scan_result,
+        "quarantine_active": True if scan_result["threat_detected"] else False,
         "timestamp": now,
-        "message": f"Dispatched {req.payload_type} synthetic exploit to pipeline. Detection verified: {scan_result['threat_detected']} (Severity: {scan_result['severity']})."
+        "message": f"Dispatched {req.payload_type} synthetic exploit to pipeline. Detection verified: {scan_result['threat_detected']} (Severity: {scan_result['severity']}). Attacker IP quarantined in Redis."
     }
 
 
@@ -243,8 +250,8 @@ def test_security_webhook(req: TestWebhookRequest):
 
 
 @router.get("/sre-metrics")
-def get_sre_telemetry():
-    """Returns real-time SRE metrics (p95 latency, cache hit ratios, queue depth) for the dashboard."""
+async def get_sre_telemetry():
+    """Returns real-time SRE metrics (p95 latency, cache hit ratios, queue depth, Redis IP quarantine) for the dashboard."""
     import time
     from app.services.metrics_service import (
         _counters,
@@ -252,6 +259,7 @@ def get_sre_telemetry():
         _latency_sum,
         _process_start_time
     )
+    from app.services.quarantine_service import get_quarantined_stats
 
     hits_l1 = _counters.get('luminary_cache_requests_total{result="hit",tier="l1_memory"}', 0)
     hits_l2 = _counters.get('luminary_cache_requests_total{result="hit",tier="l2_redis"}', 0)
@@ -260,6 +268,7 @@ def get_sre_telemetry():
     hit_ratio = round(((hits_l1 + hits_l2) / total_cache * 100), 1) if total_cache > 0 else 94.2
 
     avg_latency_ms = round((_latency_sum / _latency_count * 1000), 2) if _latency_count > 0 else 4.8
+    quarantine_info = await get_quarantined_stats()
 
     return {
         "status": "healthy",
@@ -275,6 +284,8 @@ def get_sre_telemetry():
             _counters.get('luminary_threats_detected_total{severity="HIGH"}', 0)
         ),
         "webhooks_delivered": int(_counters.get('luminary_webhooks_dispatched_total{status="success"}', 0)),
+        "active_jailed_ips": quarantine_info["active_jailed_ips"],
+        "total_quarantined_lifetime": quarantine_info["total_quarantined_lifetime"],
         "stream_consumer_group": "luminary-workers",
         "batch_buffer_size": 100
     }

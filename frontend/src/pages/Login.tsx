@@ -233,12 +233,12 @@ function AuthPageContent() {
 
           {mode !== "verify_otp" && (
             <>
-              {/* Instant Recruiter 1-Click Demo Access Box */}
+              {/* Instant 1-Click Live Demo Access Box */}
               <div className="mb-5 p-3.5 rounded-lg border border-card-border bg-foreground/[0.02] space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-                    Recruiter &amp; Reviewer Sandbox
+                    Live Sandbox
                   </span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
                     Enterprise Demo
@@ -252,8 +252,12 @@ function AuthPageContent() {
                   className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold rounded-md bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm disabled:opacity-50"
                 >
                   <Zap className="h-3.5 w-3.5 fill-background" />
-                  <span>1-Click Recruiter Demo Access</span>
+                  <span>1-Click Demo Access</span>
                 </button>
+
+                <p className="text-[10px] text-muted text-center leading-tight">
+                  Note: Backend is hosted on Render free tier. If spun down, initial connection may take ~30s to wake up.
+                </p>
 
                 <div className="flex items-center justify-between pt-1 border-t border-card-border/60 text-[11px] text-muted font-mono">
                   <span>demo@luminary.dev / demo123</span>

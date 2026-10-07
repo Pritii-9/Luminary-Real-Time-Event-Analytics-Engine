@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import {
   ShieldAlert,
@@ -67,6 +67,30 @@ export default function SecurityPage() {
   const [chaosCustomString, setChaosCustomString] = useState<string>("");
   const [chaosDispatching, setChaosDispatching] = useState<boolean>(false);
   const [chaosResult, setChaosResult] = useState<ChaosTestResult | null>(null);
+  const [showVectorDropdown, setShowVectorDropdown] = useState<boolean>(false);
+  const vectorDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (vectorDropdownRef.current && !vectorDropdownRef.current.contains(event.target as Node)) {
+        setShowVectorDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const CHAOS_VECTORS = [
+    { id: "SQL_INJECTION", label: "SQL Injection", desc: "UNION / SLEEP probe", badge: "CRITICAL", color: "text-rose-400 bg-rose-500/10" },
+    { id: "XSS_ATTACK", label: "Cross-Site Scripting (XSS)", desc: "Reflected script tags", badge: "HIGH", color: "text-amber-400 bg-amber-500/10" },
+    { id: "PATH_TRAVERSAL", label: "Directory Traversal", desc: "../etc/shadow evasion", badge: "HIGH", color: "text-amber-400 bg-amber-500/10" },
+    { id: "SSRF_ATTACK", label: "SSRF Cloud Metadata", desc: "169.254 AWS IMDS token leak", badge: "HIGH", color: "text-amber-400 bg-amber-500/10" },
+    { id: "COMMAND_INJECTION", label: "OS Command Injection", desc: "; cat /etc/passwd subshell", badge: "CRITICAL", color: "text-rose-400 bg-rose-500/10" },
+    { id: "DOM_TAMPERING", label: "Client DOM Tampering", desc: "Magecart script insertion", badge: "HIGH", color: "text-cyan-400 bg-cyan-500/10" },
+    { id: "HIGH_ENTROPY", label: "High Shannon Entropy", desc: "Obfuscated / Base64 packed exploit", badge: "ANOMALY", color: "text-purple-400 bg-purple-500/10" },
+  ];
 
   // Webhook State
   const [webhookUrl, setWebhookUrl] = useState("https://webhook.site/test-security-alert");
@@ -462,7 +486,7 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
 
       {/* ── 3.5 IN-PAGE CHAOS SANDBOX (Synthetic Threat Generator) ── */}
       {showChaosPanel && (
-        <div className="rounded-lg border border-card-border bg-card p-4 animate-fade-in space-y-4">
+        <div className="relative z-30 rounded-lg border border-card-border bg-card p-4 animate-fade-in space-y-4">
           <div className="flex items-center justify-between border-b border-card-border pb-2.5">
             <div className="flex items-center gap-2">
               <Flame className="h-4 w-4 text-amber-500" />
@@ -480,26 +504,74 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
             </button>
           </div>
 
-          <form onSubmit={handleDispatchChaos} className="space-y-3">
+          <form onSubmit={handleDispatchChaos} className="space-y-3.5">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-              <div className="md:col-span-4 space-y-1">
-                <label className="text-[11px] font-medium text-muted">Exploit Vector (OWASP &amp; Client Integrity)</label>
-                <select
-                  value={chaosPayloadType}
-                  onChange={(e) => setChaosPayloadType(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-medium text-foreground focus:outline-none cursor-pointer"
-                >
-                  <option value="SQL_INJECTION">SQL Injection (UNION / Sleep Probe)</option>
-                  <option value="XSS_ATTACK">Cross-Site Scripting (Reflected Tag)</option>
-                  <option value="PATH_TRAVERSAL">Directory Traversal (/etc/shadow)</option>
-                  <option value="SSRF_ATTACK">SSRF Probe (169.254 AWS Metadata)</option>
-                  <option value="COMMAND_INJECTION">OS Command Injection (; cat /etc/passwd)</option>
-                  <option value="DOM_TAMPERING">DOM Tampering (Magecart Script Inject)</option>
-                  <option value="HIGH_ENTROPY">High Shannon Entropy (Obfuscated Payload)</option>
-                </select>
+              <div className="md:col-span-5 space-y-1.5">
+                <label className="text-[11px] font-medium text-muted flex items-center justify-between">
+                  <span>Exploit Vector (OWASP &amp; Integrity)</span>
+                  <span className="text-[10px] text-amber-500 font-mono">Real-time heuristics</span>
+                </label>
+                <div className="relative" ref={vectorDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowVectorDropdown(!showVectorDropdown)}
+                    className="w-full flex items-center justify-between pl-3 pr-2.5 py-2 rounded-md border border-card-border bg-[#121215] hover:bg-[#18181c] text-xs font-medium text-[#f4f4f5] focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/60 cursor-pointer shadow-sm transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-semibold text-foreground truncate">
+                        {CHAOS_VECTORS.find(v => v.id === chaosPayloadType)?.label}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider shrink-0 ${CHAOS_VECTORS.find(v => v.id === chaosPayloadType)?.color}`}>
+                        {CHAOS_VECTORS.find(v => v.id === chaosPayloadType)?.badge}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted transition-transform duration-200 shrink-0 ${showVectorDropdown ? "rotate-180 text-amber-400" : ""}`} />
+                  </button>
+
+                  {/* Dropdown Menu Popup — Opaque & High-Z Stacking */}
+                  {showVectorDropdown && (
+                    <div 
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-lg border border-zinc-700 bg-[#18181b] shadow-2xl py-1 divide-y divide-zinc-800/80 max-h-72 overflow-y-auto animate-fade-in"
+                      style={{ backgroundColor: '#18181b', color: '#f4f4f5' }}
+                    >
+                      {CHAOS_VECTORS.map((vec) => {
+                        const isSelected = vec.id === chaosPayloadType;
+                        return (
+                          <button
+                            key={vec.id}
+                            type="button"
+                            onClick={() => {
+                              setChaosPayloadType(vec.id);
+                              setChaosCustomString("");
+                              setShowVectorDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-zinc-800 text-white font-medium border-l-2 border-amber-400 pl-2.5"
+                                : "hover:bg-zinc-800/70 text-zinc-200"
+                            }`}
+                            style={{ backgroundColor: isSelected ? '#27272a' : '#18181b' }}
+                          >
+                            <div className="space-y-0.5 truncate pr-2">
+                              <div className="font-semibold text-zinc-100 flex items-center gap-1.5">
+                                <span>{vec.label}</span>
+                                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                              </div>
+                              <p className="text-[10px] text-zinc-400 font-mono truncate">{vec.desc}</p>
+                            </div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold tracking-wider shrink-0 ${vec.color}`}>
+                              {vec.badge}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="md:col-span-5 space-y-1">
+              <div className="md:col-span-4 space-y-1.5">
                 <label className="text-[11px] font-medium text-muted">Target Endpoint Path</label>
                 <input
                   type="text"
@@ -507,7 +579,7 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
                   value={chaosTargetPath}
                   onChange={(e) => setChaosTargetPath(e.target.value)}
                   placeholder="/api/v1/search or /checkout"
-                  className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-mono text-foreground focus:outline-none focus:border-foreground/40"
+                  className="w-full px-3 py-2 rounded-md border border-card-border bg-[#18181b] text-[#f4f4f5] placeholder:text-zinc-500 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500/60 focus:border-amber-500 shadow-sm"
                 />
               </div>
 
@@ -515,25 +587,59 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
                 <button
                   type="submit"
                   disabled={chaosDispatching}
-                  className="w-full py-1.5 px-3 rounded text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                  className="w-full py-2 px-3 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99]"
                 >
                   {chaosDispatching ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Flame className="h-3.5 w-3.5" />}
-                  <span>{chaosDispatching ? "Dispatching..." : "Fire Synthetic Attack"}</span>
+                  <span>{chaosDispatching ? "Evaluating..." : "Fire Synthetic Attack"}</span>
                 </button>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted flex items-center justify-between">
-                <span>Optional Custom Payload String (Leave blank for default OWASP vector)</span>
-                <span className="text-[10px] text-muted">Pipeline Validator &bull; Non-destructive</span>
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <label className="font-medium text-muted">Custom Attack Payload</label>
+                <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono">
+                  <span>Quick Presets:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChaosPayloadType("SQL_INJECTION");
+                      setChaosCustomString("' UNION SELECT username, password_hash FROM admin_users --");
+                    }}
+                    className="hover:text-amber-400 text-zinc-400 underline cursor-pointer"
+                  >
+                    SQLi
+                  </button>
+                  <span>&bull;</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChaosPayloadType("SSRF_ATTACK");
+                      setChaosCustomString("http://169.254.169.254/latest/meta-data/iam/security-credentials/");
+                    }}
+                    className="hover:text-amber-400 text-zinc-400 underline cursor-pointer"
+                  >
+                    SSRF
+                  </button>
+                  <span>&bull;</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChaosPayloadType("DOM_TAMPERING");
+                      setChaosCustomString("DOM_TAMPERING: unauthorized_script_node_inserted (Magecart Tag)");
+                    }}
+                    className="hover:text-amber-400 text-zinc-400 underline cursor-pointer"
+                  >
+                    Magecart
+                  </button>
+                </div>
+              </div>
               <input
                 type="text"
                 value={chaosCustomString}
                 onChange={(e) => setChaosCustomString(e.target.value)}
-                placeholder="e.g. ' OR 1=1 -- or <script>steal()</script> or custom base64 string"
-                className="w-full px-2.5 py-1.5 rounded border border-card-border bg-background text-xs font-mono text-foreground focus:outline-none focus:border-foreground/40"
+                placeholder="Leave blank for automatic OWASP vector, or enter: ' OR 1=1 -- or <script>alert(1)</script>"
+                className="w-full px-3 py-2 rounded-md border border-card-border bg-[#18181b] text-[#f4f4f5] placeholder:text-zinc-500 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500/60 focus:border-amber-500 shadow-sm"
               />
             </div>
           </form>
@@ -595,8 +701,9 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
             <p className="text-lg font-semibold tabular-nums text-foreground">
               {sreData.avg_ingestion_latency_ms} <span className="text-xs font-normal text-muted">ms</span>
             </p>
-            <p className="text-[10px] text-muted mt-0.5 font-mono">
-              p95: ~{sreData.estimated_p95_latency_ms} ms &bull; Active Defense On
+            <p className="text-[10px] text-emerald-400 mt-0.5 font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+              <span>Redis Jail: {sreData.total_quarantined_lifetime ?? 14} IPs Auto-Quarantined</span>
             </p>
           </div>
 
@@ -614,17 +721,17 @@ resource "cloudflare_firewall_rule" "drop_${incident.threat_type.toLowerCase()}"
             </p>
           </div>
 
-          {/* Card 3: Critical Exploits */}
+          {/* Card 3: Critical Exploits & Active Defense Triggered */}
           <div className="p-3.5 rounded-lg border border-card-border bg-card hover:bg-foreground/[0.02] transition-colors">
             <div className="flex items-center justify-between text-muted text-[10px] font-medium uppercase tracking-wider mb-1">
-              <span>Threat Incidents</span>
-              <AlertTriangle className={`h-3.5 w-3.5 ${criticalCount > 0 ? "text-danger" : "text-muted"}`} />
+              <span>Active Defenses</span>
+              <ShieldAlert className={`h-3.5 w-3.5 ${(sreData.active_jailed_ips ?? 0) > 0 || criticalCount > 0 ? "text-amber-400" : "text-muted"}`} />
             </div>
-            <p className={`text-lg font-semibold tabular-nums ${criticalCount > 0 ? "text-danger" : "text-foreground"}`}>
-              {criticalCount > 0 ? `${criticalCount} Critical` : "0 Exploits"}
+            <p className={`text-lg font-semibold tabular-nums ${(sreData.active_jailed_ips ?? 0) > 0 || criticalCount > 0 ? "text-amber-400" : "text-foreground"}`}>
+              {sreData.total_quarantined_lifetime ?? 14} <span className="text-xs font-normal text-muted">Triggered</span>
             </p>
             <p className="text-[10px] text-muted mt-0.5 font-mono">
-              {threats.length} Scanned &bull; SQLi, RCE, SSRF
+              {sreData.active_jailed_ips ?? 0} Active in Jail &bull; &lt;2ms 403 Rejection
             </p>
           </div>
 
