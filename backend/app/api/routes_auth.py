@@ -12,7 +12,7 @@ from app.core.auth import (
     hash_password,
     verify_password,
 )
-from app.core.database import User, get_session
+from app.core.database import User, Site, get_session
 from app.services.redis_client import redis_client
 from app.services.email_service import send_otp_email
 from app.services.rate_limiter import is_rate_limited
@@ -263,6 +263,86 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
     token = create_access_token(user.id, user.email)
 
     # Also set HTTP-only cookie for browser convenience
+    is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
+    samesite_val = "none" if is_secure else "lax"
+    response.set_cookie(
+        key="luminary_token",
+        value=token,
+        httponly=True,
+        samesite=samesite_val,
+        secure=is_secure,
+        max_age=86400,
+    )
+
+    return TokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            company_name=user.company_name,
+            plan=user.plan,
+            subscription_status=user.subscription_status or "active",
+            monthly_pageview_limit=user.monthly_pageview_limit,
+        ),
+    )
+
+
+@router.post("/demo", response_model=TokenResponse)
+async def demo_login(request: Request, response: Response, session: SQLSession = Depends(get_session)):
+    """Instant 1-Click Recruiter/Reviewer demo login.
+    Automatically provisions or reuses a demo enterprise workspace with active telemetry.
+    """
+    demo_email = "demo@luminary.dev"
+    user = session.exec(select(User).where(func.lower(User.email) == demo_email)).first()
+
+    if not user:
+        user = User(
+            email=demo_email,
+            password_hash=hash_password("demo123"),
+            full_name="Technical Recruiter / Evaluator",
+            company_name="Enterprise Cloud Labs",
+            is_verified=True,
+            plan="enterprise",
+            subscription_status="active",
+            monthly_pageview_limit=1000000,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Seed initial demo site
+        demo_site = Site(
+            user_id=user.id,
+            site_id="site_demo_prod",
+            name="Acme Cloud Platform",
+            domain="cloud.acme.com",
+            public_token="lum_demo_token_99x",
+        )
+        session.add(demo_site)
+        session.commit()
+
+        # Seed simulated threats
+        try:
+            from app.services.cyber_threat_service import cyber_threat_service
+            await cyber_threat_service.simulate_threats("site_demo_prod")
+        except Exception:
+            pass
+    else:
+        # Ensure site exists
+        existing_site = session.exec(select(Site).where(Site.user_id == user.id)).first()
+        if not existing_site:
+            demo_site = Site(
+                user_id=user.id,
+                site_id="site_demo_prod",
+                name="Acme Cloud Platform",
+                domain="cloud.acme.com",
+                public_token="lum_demo_token_99x",
+            )
+            session.add(demo_site)
+            session.commit()
+
+    token = create_access_token(user.id, user.email)
     is_secure = request.url.scheme == "https" and "localhost" not in (request.url.netloc or "") and "127.0.0.1" not in (request.url.netloc or "")
     samesite_val = "none" if is_secure else "lax"
     response.set_cookie(

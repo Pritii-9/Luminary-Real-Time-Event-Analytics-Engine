@@ -2,12 +2,12 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail, User, Zap, Sparkles } from "lucide-react";
 
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import Toast from "@/components/Toast";
-import { getToken, login, register, resendOtp, verifyOtp, getMe } from "@/lib/api";
+import { getToken, login, register, resendOtp, verifyOtp, getMe, demoLogin } from "@/lib/api";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -101,6 +101,30 @@ function AuthPageContent() {
     } finally {
       setResending(false);
     }
+  };
+
+  const handleInstantDemo = async () => {
+    setLoading(true);
+    setToast(null);
+    try {
+      await demoLogin();
+      setToast({ message: "Enterprise demo workspace loaded. Redirecting...", type: "success" });
+      setTimeout(() => {
+        navigate("/sites");
+      }, 500);
+    } catch (err: unknown) {
+      setToast({ message: getErrorMessage(err, "Failed to connect to demo workspace."), type: "error" });
+      setLoading(false);
+    }
+  };
+
+  const handleFillDemoCredentials = () => {
+    setMode("signin");
+    setEmail("demo@luminary.dev");
+    setPassword("demo123");
+    setEmailError("");
+    setPasswordError("");
+    setToast({ message: "Demo credentials populated. Click '1-Click Demo' or 'Sign In'.", type: "success" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -208,14 +232,50 @@ function AuthPageContent() {
           </div>
 
           {mode !== "verify_otp" && (
-            <div className="relative mb-5 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-card-border" />
+            <>
+              {/* Instant Recruiter 1-Click Demo Access Box */}
+              <div className="mb-5 p-3.5 rounded-lg border border-card-border bg-foreground/[0.02] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                    Recruiter &amp; Reviewer Sandbox
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                    Enterprise Demo
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleInstantDemo}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold rounded-md bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <Zap className="h-3.5 w-3.5 fill-background" />
+                  <span>1-Click Recruiter Demo Access</span>
+                </button>
+
+                <div className="flex items-center justify-between pt-1 border-t border-card-border/60 text-[11px] text-muted font-mono">
+                  <span>demo@luminary.dev / demo123</span>
+                  <button
+                    type="button"
+                    onClick={handleFillDemoCredentials}
+                    className="text-foreground hover:underline cursor-pointer font-medium"
+                  >
+                    Auto-fill
+                  </button>
+                </div>
               </div>
-              <span className="relative bg-card px-3 text-[10px] uppercase tracking-wider font-medium text-muted">
-                Continue with email
-              </span>
-            </div>
+
+              <div className="relative mb-5 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-card-border" />
+                </div>
+                <span className="relative bg-card px-3 text-[10px] uppercase tracking-wider font-medium text-muted">
+                  Or continue with credentials
+                </span>
+              </div>
+            </>
           )}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">

@@ -1,6 +1,21 @@
-# Luminary
+# Luminary — Scalable Web Event & Threat Intelligence Engine
 
-A privacy-friendly web analytics and telemetry platform designed for high-throughput event ingestion, real-time analytics, and automated security monitoring.
+A high-throughput distributed telemetry ingestion engine and real-time observability platform with Redis Stream micro-batching, live OpenMetrics exposition, and heuristic OWASP threat detection.
+
+---
+
+### 🌐 Live Production Deployments & Instant Demo
+
+| Resource | Live Endpoint | Description |
+|:---|:---|:---|
+| **Web Console (SPA)** | [luminary-scalable-web-event-engine.vercel.app](https://luminary-scalable-web-event-engine.vercel.app) | React 19 / Vite telemetry console with in-place SRE inspection |
+| **Backend Ingestion API** | [luminary-scalable-web-event-engine.onrender.com](https://luminary-scalable-web-event-engine.onrender.com) | FastAPI high-throughput collector service |
+| **OpenMetrics Exporter** | [luminary-scalable-web-event-engine.onrender.com/metrics](https://luminary-scalable-web-event-engine.onrender.com/metrics) | Live OpenMetrics exposition for Prometheus & Datadog |
+| **API Health Check** | [luminary-scalable-web-event-engine.onrender.com/health](https://luminary-scalable-web-event-engine.onrender.com/health) | Live service uptime & Redis connectivity status |
+
+> **⚡ 1-Click Recruiter Sandbox:** Open [the Live App](https://luminary-scalable-web-event-engine.vercel.app/login) and click **"1-Click Recruiter Demo Access"** to immediately access an enterprise workspace pre-seeded with active telemetry and OWASP exploit logs (no registration required).
+> 
+> *Manual credentials:* `demo@luminary.dev` / `demo123`
 
 ---
 
@@ -43,21 +58,25 @@ Instead of writing events directly to the database on every HTTP request (which 
 * **Bulk Worker Writes:** A background daemon (`stream_worker.py`) reads events in batches of 100 (`XREADGROUP`) and persists them in a single database transaction, eliminating database write contention.
 * **Real-Time Cardinality:** Uses Redis Sorted Sets (`ZSET`) with `ZREMRANGEBYSCORE` to track active concurrent visitors over a rolling 5-minute window in $O(1)$ memory lookup time.
 
-### 3. Privacy-First Identity (GDPR Compliant)
+### 3. OpenMetrics / Prometheus Exporter & SIEM Webhooks
+* **Native `/metrics` Endpoint:** Real-time OpenMetrics stream exposing ingestion latency (p50/p95), cache hit ratios (L1 Memory / L2 Redis), and active consumer group buffer sizes.
+* **HMAC-SHA256 SIEM Webhook Dispatch:** Cryptographically signed incident alert payloads dispatched to external SIEM endpoints (Splunk, Datadog, Slack, Discord).
+
+### 4. Privacy-First Identity (GDPR Compliant)
 * **No Third-Party Cookies:** Uses first-party `localStorage` (`visitor_id`) and `sessionStorage` (`session_id`).
 * **Cryptographic IP Salting:** If storage is disabled, the backend generates an anonymized hash:
   $$\text{Hash} = \text{SHA-256}(\text{Client IP} + \text{Daily Rotating Salt} + \text{User Agent})$$
   Because the salt changes daily, visitor tracking across days is mathematically irreversible, ensuring compliance with GDPR and ePrivacy directives.
 
-### 4. Statistical Anomaly Detection
+### 5. Statistical Anomaly Detection
 * **Rolling Z-Score Engine:** In [`app/services/anomaly_service.py`](backend/app/services/anomaly_service.py), traffic is evaluated against a 7-day rolling hourly baseline using **NumPy** and **Pandas**:
   $$Z = \frac{x - \mu}{\sigma}$$
   Flags a `SPIKE` when $Z \ge 2.5$ and a `DROP_OFF` (downtime or broken routes) when $Z \le -2.0$.
 
-### 5. Threat Intelligence & LLM Triage
-* **OWASP Heuristic Scanner:** Inspects query parameters and paths for SQL injection, XSS, and command injection patterns.
+### 6. Threat Intelligence & In-Place Accordion Triage
+* **OWASP Heuristic Scanner:** Inspects query parameters and paths for SQL injection, XSS, SSRF, and directory traversal.
 * **Shannon Entropy Analysis:** Calculates string randomness ($H(X) = -\sum P(x) \log_2 P(x)$) on query strings to detect obfuscated or Base64-encoded exploits.
-* **LLM Incident Analyst:** Sends flagged payloads to **Groq Cloud (Llama 3.1 8B Instant)** to produce a technical exploit breakdown, a ready-to-use Cloudflare/ModSecurity WAF rule, and a developer code remediation snippet.
+* **LLM Incident Analyst & In-Place Accordion Triage:** Generates root-cause telemetry, ready-to-use Cloudflare WAF rules, Terraform IaC, and Python code fixes via **Groq Cloud (Llama 3.1 8B)**, expanding directly in-place inside the incident table.
 
 ---
 

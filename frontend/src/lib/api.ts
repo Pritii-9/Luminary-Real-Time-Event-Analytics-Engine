@@ -131,6 +131,14 @@ export async function login(email: string, password: string) {
   return data;
 }
 
+export async function demoLogin() {
+  const data = await apiFetch<AuthResponse>("/api/v1/auth/demo", {
+    method: "POST",
+  });
+  setToken(data.access_token);
+  return data;
+}
+
 export async function logout() {
   await apiFetch("/api/v1/auth/logout", { method: "POST" }).catch(() => {});
   clearToken();
